@@ -1,0 +1,4 @@
+<flow name="test">
+  <http:listener path="/hello"/>
+  <set-payload value="Hello"/>
+</flow>
