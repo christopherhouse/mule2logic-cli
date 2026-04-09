@@ -8,6 +8,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![GitHub Copilot](https://img.shields.io/badge/Powered%20by-GitHub%20Copilot-8957e5?logo=github)](https://github.com/features/copilot)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/christopherhouse/mule2logic-cli/pulls)
+[![Experimental](https://img.shields.io/badge/Status-Experimental-orange)]()
 
 <br />
 
@@ -15,28 +16,112 @@
 
 <br />
 
-*Drop in your MuleSoft XML, get back deployable Logic Apps JSON. It's that simple.* 🚀
+*Drop in your MuleSoft XML, get back Logic Apps JSON. A starting point, not a finished product.* 🧪
 
 </div>
 
 ---
 
+## ⚠️ Disclaimer
+
+> **This project is experimental and under active development.** It uses AI (GitHub Copilot SDK) to generate Logic Apps JSON from MuleSoft XML. AI-generated output can be incorrect, incomplete, or subtly wrong. **Do not deploy the output to production without thorough manual review and testing.** There are no guarantees that any conversion is correct. Use at your own risk.
+
 ## 🤔 What is this?
 
-`mule2logic` is a lightweight Node.js CLI that uses the **GitHub Copilot SDK** — grounded with [Microsoft Learn MCP](https://learn.microsoft.com/api/mcp) — to intelligently convert MuleSoft XML flow definitions into **production-ready Azure Logic Apps Standard workflow JSON**.
+`mule2logic` is an experimental Node.js CLI that uses the **GitHub Copilot SDK** — grounded with [Microsoft Learn MCP](https://learn.microsoft.com/api/mcp) and [Context7 MCP](https://mcp.context7.com) — to convert MuleSoft XML flow definitions into Azure Logic Apps Standard workflow JSON.
 
-No manual rewriting. No copy-paste marathons. Just point it at your MuleSoft XML and let AI do the heavy lifting. 💪
+The tool *attempts* to handle a wide range of MuleSoft components: connectors, processors, routers, scopes, error handlers, DataWeave transformations, and enterprise integration patterns. A built-in QC review agent does a second pass on every conversion, but this is best-effort — **always review the output yourself**.
 
-### 🧩 Supported MuleSoft → Logic Apps Mappings
+### 🧩 MuleSoft → Logic Apps Coverage (Aspirational)
+
+The tables below show the mappings the tool *attempts*. Coverage varies — simple flows tend to convert well, complex ones may need manual fixes.
+
+<details>
+<summary><strong>Triggers — Inbound Endpoints</strong></summary>
 
 | MuleSoft Element | Logic Apps Equivalent |
 |---|---|
-| `<http:listener>` | HTTP trigger (Request trigger) |
-| `<set-payload>` | Compose action |
-| `<choice>` / `<when>` | Condition action (If) |
-| `<foreach>` | For_each action |
-| `<logger>` | Compose action (for logging) |
-| `<flow>` | Workflow definition wrapper |
+| `http:listener` | Request trigger (Http) |
+| `scheduler` / `poll` / cron | Recurrence trigger |
+| `jms:listener` / `amqp:listener` | Service Bus trigger |
+| `file:listener` / `ftp:listener` / `sftp:listener` | File/FTP/SFTP connector trigger |
+| `email:listener-imap` / `email:listener-pop3` | Office 365 Outlook trigger |
+| `vm:listener` | Service Bus / Storage Queue trigger |
+| `salesforce:replay-topic-listener` | Salesforce connector trigger |
+| `db:listener` (polling) | Recurrence + SQL query polling |
+| APIkit router (`apikit:router`) | Request trigger + condition routing |
+| Sub-flows (no inbound endpoint) | Child workflow or inline actions |
+
+</details>
+
+<details>
+<summary><strong>Core Processors</strong></summary>
+
+| MuleSoft Element | Logic Apps Equivalent |
+|---|---|
+| `set-payload` | Compose action |
+| `set-variable` / `remove-variable` | InitializeVariable / SetVariable |
+| `logger` | Compose action |
+| `raise-error` | Terminate action |
+| `transform-message` (DataWeave) | Compose with expressions or Inline Code (JS) |
+| `object-to-json` / `json-to-object` | Parse JSON / Compose |
+| `object-to-xml` / `xml-to-object` | XML composition / XML Validation |
+| `expression-component` | Compose or Inline Code (JS) |
+
+</details>
+
+<details>
+<summary><strong>Flow Control & Routers</strong></summary>
+
+| MuleSoft Element | Logic Apps Equivalent |
+|---|---|
+| `choice` / `when` / `otherwise` | If or Switch action |
+| `foreach` | Foreach action |
+| `parallel-foreach` | Foreach (parallel concurrency) |
+| `scatter-gather` | Parallel branches via shared `runAfter` |
+| `first-successful` | Chained scopes with failure `runAfter` |
+| `until-successful` | Until action or `retryPolicy` |
+| `flow-ref` | Inlined actions or HTTP call to child workflow |
+
+</details>
+
+<details>
+<summary><strong>Error Handling</strong></summary>
+
+| MuleSoft Element | Logic Apps Equivalent |
+|---|---|
+| `try` scope | Scope action |
+| `on-error-continue` | `runAfter: { "Scope": ["Failed"] }` — continues |
+| `on-error-propagate` | `runAfter` on failure + Terminate |
+| Error type matching | Conditions checking `@result('ScopeName')` |
+
+</details>
+
+<details>
+<summary><strong>Connectors & Outbound Operations</strong></summary>
+
+| MuleSoft Element | Logic Apps Equivalent |
+|---|---|
+| `http:request` | HTTP action |
+| `db:select` / `db:insert` / `db:update` / `db:delete` | SQL connector actions |
+| `salesforce:create` / `query` / `update` / `delete` | Salesforce connector actions |
+| `email:send` | Office 365 Outlook Send action |
+| `file:*` / `ftp:*` / `sftp:*` | Blob/File/FTP/SFTP connector actions |
+| `jms:*` / `amqp:*` | Service Bus connector actions |
+| `web-service-consumer` (SOAP) | HTTP action with SOAP envelope |
+| `os:store` / `os:retrieve` (ObjectStore) | Table Storage / Redis actions |
+| `batch:job` / `batch:step` | Foreach with batching |
+| `crypto:*` | Inline Code (JS) or Key Vault connector |
+| `validation:*` | Condition actions |
+
+</details>
+
+<details>
+<summary><strong>Enterprise Patterns</strong></summary>
+
+Content-based routing, message enrichment, splitter/aggregator, idempotent filtering, correlation IDs, retry/circuit breaker, and watermark polling are attempted where detected in the source XML.
+
+</details>
 
 ---
 
@@ -60,8 +145,6 @@ npm install
 # Link the CLI globally
 npm link
 ```
-
-That's it — you now have the `mule2logic` command ready to go! 🎉
 
 ---
 
@@ -88,13 +171,25 @@ mule2logic convert flow.xml --output workflow.json --pretty
 ### Get an AI explanation of the conversion
 
 ```bash
-mule2logic convert flow.xml --explain
+mule2logic convert flow.xml --explain --pretty
 ```
 
-### Debug mode
+### Use a different model
 
 ```bash
-mule2logic convert flow.xml --verbose
+mule2logic convert flow.xml --model gpt-4.1
+```
+
+### Skip the QC review agent
+
+```bash
+mule2logic convert flow.xml --no-review
+```
+
+### Increase timeout for large flows
+
+```bash
+mule2logic convert big-flow.xml --timeout 600000
 ```
 
 ### 🎛️ All CLI Flags
@@ -105,6 +200,10 @@ mule2logic convert flow.xml --verbose
 | `--explain` | 💡 Include an AI-generated explanation of the conversion |
 | `--pretty` | 🎨 Pretty-print the JSON output (2-space indent) |
 | `--verbose` | 🔍 Print debug information to stderr |
+| `--debug` | 🐛 Dump raw Copilot response to stderr |
+| `--model <model>` | 🧠 Model to use (default: `claude-opus-4.6`) |
+| `--timeout <ms>` | ⏱️ Timeout per Copilot call in ms (default: `300000`) |
+| `--no-review` | ⏭️ Skip the QC review agent step |
 
 ---
 
@@ -147,27 +246,27 @@ mule2logic convert hello-flow.xml --pretty
 }
 ```
 
-✅ Ready to deploy to Azure Logic Apps Standard!
-
 ---
 
 ## 🏗️ Architecture
 
 ```
-XML Input  →  io.js  →  prompt.js  →  copilot.js  →  validate.js  →  JSON Output
- (file          (read)    (build        (Copilot SDK    (parse &        (stdout
-  or stdin)                prompt)       + Learn MCP)     validate)       or file)
+                    ┌──────────────┐
+XML Input  →  io.js  →  prompt.js  →  copilot.js  →  validate.js  →  review.js  →  JSON Output
+ (file          (read)    (build        (Copilot SDK    (parse &        (QC review    (stdout
+  or stdin)                prompt)       + MCP servers)   validate)       agent)        or file)
 ```
 
-The CLI follows a clean, linear pipeline:
+The CLI follows a pipeline with a **two-pass AI architecture**:
 
-1. **📥 Load** — Read MuleSoft XML from a file or stdin
-2. **📝 Prompt** — Build a structured prompt for the AI model
-3. **🤖 Convert** — Send to GitHub Copilot SDK (grounded via Microsoft Learn MCP)
-4. **✅ Validate** — Ensure the response is valid Logic Apps JSON
-5. **📤 Output** — Write to stdout or a file
+1. **📥 Load** — Read MuleSoft XML from a file or stdin (`io.js`)
+2. **📝 Prompt** — Build structured prompts from markdown templates (`prompt.js` + `prompts/`)
+3. **🤖 Convert** — Send to GitHub Copilot SDK, grounded via Microsoft Learn MCP (Logic Apps schema) and Context7 MCP (MuleSoft docs) (`copilot.js`)
+4. **✅ Validate** — Ensure the response is valid Logic Apps JSON with structural checks (`validate.js`)
+5. **🔍 Review** — A second AI pass validates semantic correctness, checks for dropped elements, and fixes issues (`review.js`)
+6. **📤 Output** — Write to stdout or a file
 
-> If validation fails, the tool **automatically retries once** before giving up — because even AI deserves a second chance 😄
+> If validation fails on step 4, the tool **retries once** automatically.
 
 For a deep dive, check out the [Architecture doc](docs/architecture.md).
 
@@ -178,20 +277,26 @@ For a deep dive, check out the [Architecture doc](docs/architecture.md).
 ```
 mule2logic-cli/
 ├── src/
-│   ├── cli.js                 # 🎯 CLI entry point (commander)
+│   ├── cli.js                 # CLI entry point (commander)
 │   ├── commands/
-│   │   └── convert.js         # 🔄 Conversion pipeline orchestrator
-│   └── core/
-│       ├── copilot.js         # 🤖 Copilot SDK + Learn MCP client
-│       ├── prompt.js          # 📝 System & user prompt builder
-│       ├── io.js              # 📥 File and stdin reader
-│       └── validate.js        # ✅ JSON structure validator
+│   │   └── convert.js         # Conversion pipeline orchestrator
+│   ├── core/
+│   │   ├── copilot.js         # Copilot SDK + MCP server client
+│   │   ├── prompt.js          # Prompt template loader
+│   │   ├── io.js              # File and stdin reader
+│   │   ├── validate.js        # JSON structure validator
+│   │   └── review.js          # QC review agent
+│   └── prompts/
+│       ├── system.prompt.md   # System prompt (conversion rules)
+│       ├── user.prompt.md     # User prompt template
+│       └── review.prompt.md   # Review agent system prompt
 ├── test/
-│   └── fixtures/              # 📋 Test XML fixtures
+│   ├── *.test.js              # Unit tests (Node.js test runner)
+│   └── fixtures/              # Test XML fixtures
 ├── docs/
-│   ├── mule2logic-cli-spec-v2.md   # 📘 Full product spec
-│   ├── architecture.md              # 🏗️ Architecture overview
-│   └── test-cases.md                # 🧪 Test case definitions
+│   ├── mule2logic-cli-spec-v2.md
+│   ├── architecture.md
+│   └── test-cases.md
 ├── package.json
 └── LICENSE
 ```
@@ -208,13 +313,16 @@ npm test
 
 Test coverage includes:
 
-- ✅ Simple HTTP flow conversion
-- ✅ Conditional (`choice`/`when`) conversion
-- ✅ Loop (`foreach`) conversion
-- ✅ Missing file error handling
-- ✅ Empty input error handling
+- ✅ End-to-end conversion pipeline
+- ✅ Pretty-print, explain, and output-to-file flags
+- ✅ Verbose logging
+- ✅ Missing file and empty input error handling
 - ✅ Invalid JSON retry logic
-- ✅ All CLI flags (`--output`, `--pretty`, `--explain`, `--verbose`)
+- ✅ Copilot SDK client lifecycle
+- ✅ MCP server configuration
+- ✅ Prompt building and template loading
+- ✅ JSON validation and structural checks
+- ✅ Review agent workflow
 
 See [test-cases.md](docs/test-cases.md) for full details.
 
@@ -222,14 +330,14 @@ See [test-cases.md](docs/test-cases.md) for full details.
 
 ## 🛡️ Error Handling
 
-The CLI is designed to fail gracefully:
-
 | Scenario | Behavior |
 |---|---|
 | 📄 Missing file | Friendly error message → exit code `1` |
 | 📭 Empty input | Friendly error message → exit code `1` |
 | ❌ Invalid JSON from AI | Retry once automatically |
 | ❌❌ Retry also fails | Error message → exit code `1` |
+| ⏱️ Timeout | Configurable via `--timeout` (default 5 min) |
+| 🔍 Review agent fails | Falls back to original conversion output |
 
 ---
 

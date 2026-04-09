@@ -2,8 +2,9 @@ import { CopilotClient, approveAll } from '@github/copilot-sdk';
 import { SYSTEM_PROMPT } from './prompt.js';
 
 export const DEFAULT_MODEL = 'claude-opus-4.6';
+export const DEFAULT_TIMEOUT = 300_000; // 5 minutes — MCP tool calls can be slow
 
-export async function runCopilot(prompt, { verbose = false, systemPrompt = SYSTEM_PROMPT, model = DEFAULT_MODEL } = {}) {
+export async function runCopilot(prompt, { verbose = false, systemPrompt = SYSTEM_PROMPT, model = DEFAULT_MODEL, timeout = DEFAULT_TIMEOUT } = {}) {
   const client = new CopilotClient();
 
   try {
@@ -20,6 +21,11 @@ export async function runCopilot(prompt, { verbose = false, systemPrompt = SYSTE
         learn: {
           type: 'http',
           url: 'https://learn.microsoft.com/api/mcp',
+          tools: ['*'],
+        },
+        context7: {
+          type: 'http',
+          url: 'https://mcp.context7.com/mcp',
           tools: ['*'],
         },
       },
@@ -41,7 +47,7 @@ export async function runCopilot(prompt, { verbose = false, systemPrompt = SYSTE
       });
     }
 
-    const response = await session.sendAndWait({ prompt });
+    const response = await session.sendAndWait({ prompt }, timeout);
 
     await session.disconnect();
 

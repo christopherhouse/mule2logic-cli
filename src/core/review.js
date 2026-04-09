@@ -15,7 +15,7 @@ const REVIEW_PROMPT = readFileSync(
  * Copilot with a validation-focused system prompt. Returns the (possibly corrected)
  * parsed workflow object.
  */
-export async function reviewWorkflow(xml, parsed, { verbose = false, model } = {}) {
+export async function reviewWorkflow(xml, parsed, { verbose = false, model, timeout } = {}) {
   const structuralIssues = validateWorkflowStructure(parsed);
 
   if (structuralIssues.length === 0) {
@@ -37,6 +37,7 @@ export async function reviewWorkflow(xml, parsed, { verbose = false, model } = {
     verbose,
     systemPrompt: REVIEW_PROMPT,
     model,
+    timeout,
   });
 
   const reviewed = validateJson(response);
