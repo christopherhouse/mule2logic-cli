@@ -65,9 +65,15 @@ export async function convertCommand(input, options) {
     }
     const spinner3 = createSpinner(`${c.yellow('Calling Copilot AI')} ${c.dim('(this may take a moment...)')}`);
     const startTime = Date.now();
-    let response = await runCopilot(prompt);
+    let response = await runCopilot(prompt, { verbose: !!options.verbose });
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
     spinner3.stop(`${c.green('✔')} ${c.bold('Copilot responded')} ${c.dim(`(${elapsed}s)`)}`);
+
+    if (options.debug) {
+      console.error(`\n${c.cyan('━━━ Raw Copilot Response ━━━')}`);
+      console.error(response);
+      console.error(`${c.cyan('━━━ End Raw Response ━━━')}\n`);
+    }
 
     // 4. Validate JSON (retry once on failure)
     let parsed;
@@ -80,8 +86,13 @@ export async function convertCommand(input, options) {
         console.error(`[verbose] Validation failed: ${err.message}. Retrying...`);
       }
       const spinner4 = createSpinner(c.yellow('Retrying Copilot call...'));
-      response = await runCopilot(prompt);
+      response = await runCopilot(prompt, { verbose: !!options.verbose });
       spinner4.stop(`${c.green('✔')} ${c.bold('Retry complete')}`);
+      if (options.debug) {
+        console.error(`\n${c.cyan('━━━ Raw Copilot Response (retry) ━━━')}`);
+        console.error(response);
+        console.error(`${c.cyan('━━━ End Raw Response ━━━')}\n`);
+      }
       try {
         parsed = validateJson(response);
         console.error(`${c.green('✔')} ${c.bold('Output validated on retry')}`);

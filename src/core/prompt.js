@@ -1,18 +1,18 @@
-export const SYSTEM_PROMPT = `You are an expert Azure Integration Architect.
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 
-Convert MuleSoft flows into Azure Logic Apps Standard workflows.
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const promptsDir = join(__dirname, '..', 'prompts');
 
-Rules:
-- Output ONLY valid JSON
-- No markdown
-- Include triggers and actions
-- Preserve logic
-- Use Azure best practices`;
+function loadPrompt(filename) {
+  return readFileSync(join(promptsDir, filename), 'utf-8').trim();
+}
+
+export const SYSTEM_PROMPT = loadPrompt('system.prompt.md');
+
+const userTemplate = loadPrompt('user.prompt.md');
 
 export function buildPrompt(xml) {
-  return `Convert MuleSoft XML to Logic Apps JSON:
-
-${xml}
-
-Return only JSON.`;
+  return userTemplate.replace('{{xml}}', xml);
 }

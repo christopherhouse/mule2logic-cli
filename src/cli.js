@@ -15,6 +15,7 @@ program
   .option('--explain', 'Include explanation')
   .option('--pretty', 'Pretty-print JSON')
   .option('--verbose', 'Debug logs')
+  .option('--debug', 'Dump raw Copilot response to stderr')
   .action(convertCommand);
 
 program.parse();
