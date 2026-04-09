@@ -1,7 +1,18 @@
-export function buildSystemPrompt() {
-  // TODO: Return the system prompt from spec section 6
-}
+export const SYSTEM_PROMPT = `You are an expert Azure Integration Architect.
 
-export function buildUserPrompt(xml) {
-  // TODO: Wrap MuleSoft XML in a conversion request
+Convert MuleSoft flows into Azure Logic Apps Standard workflows.
+
+Rules:
+- Output ONLY valid JSON
+- No markdown
+- Include triggers and actions
+- Preserve logic
+- Use Azure best practices`;
+
+export function buildPrompt(xml) {
+  return `Convert MuleSoft XML to Logic Apps JSON:
+
+${xml}
+
+Return only JSON.`;
 }
