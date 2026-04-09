@@ -1,6 +1,6 @@
 import { readInput } from '../core/io.js';
 import { buildPrompt } from '../core/prompt.js';
-import { runCopilot, DEFAULT_MODEL } from '../core/copilot.js';
+import { runCopilot, DEFAULT_MODEL, DEFAULT_TIMEOUT } from '../core/copilot.js';
 import { validateJson, validateWorkflowStructure } from '../core/validate.js';
 import { reviewWorkflow } from '../core/review.js';
 import { writeFile } from 'fs/promises';
@@ -60,8 +60,10 @@ export async function convertCommand(input, options) {
     }
     console.error(`${c.green('✔')} ${c.bold('Prompt built')}`);
     const model = options.model || DEFAULT_MODEL;
+    const timeout = options.timeout || DEFAULT_TIMEOUT;
     if (options.verbose) {
       console.error(`[verbose] Using model: ${model}`);
+      console.error(`[verbose] Timeout: ${timeout}ms`);
     }
 
     // 3. Call Copilot
@@ -70,7 +72,7 @@ export async function convertCommand(input, options) {
     }
     const spinner3 = createSpinner(`${c.yellow('Calling Copilot AI')} ${c.dim('(this may take a moment...)')}`);
     const startTime = Date.now();
-    let response = await runCopilot(prompt, { verbose: !!options.verbose, model });
+    let response = await runCopilot(prompt, { verbose: !!options.verbose, model, timeout });
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
     spinner3.stop(`${c.green('✔')} ${c.bold('Copilot responded')} ${c.dim(`(${elapsed}s)`)}`);
 
@@ -91,7 +93,7 @@ export async function convertCommand(input, options) {
         console.error(`[verbose] Validation failed: ${err.message}. Retrying...`);
       }
       const spinner4 = createSpinner(c.yellow('Retrying Copilot call...'));
-      response = await runCopilot(prompt, { verbose: !!options.verbose, model });
+      response = await runCopilot(prompt, { verbose: !!options.verbose, model, timeout });
       spinner4.stop(`${c.green('✔')} ${c.bold('Retry complete')}`);
       if (options.debug) {
         console.error(`\n${c.cyan('━━━ Raw Copilot Response (retry) ━━━')}`);
@@ -121,7 +123,7 @@ export async function convertCommand(input, options) {
       const spinner5 = createSpinner(`${c.yellow('Running QC review agent')} ${c.dim('(validating workflow...)')}`);
       try {
         const reviewStart = Date.now();
-        const { workflow: reviewed, issues: remainingIssues } = await reviewWorkflow(xml, parsed, { verbose: !!options.verbose, model });
+        const { workflow: reviewed, issues: remainingIssues } = await reviewWorkflow(xml, parsed, { verbose: !!options.verbose, model, timeout });
         const reviewElapsed = ((Date.now() - reviewStart) / 1000).toFixed(1);
 
         if (remainingIssues.length > 0) {

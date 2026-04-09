@@ -17,6 +17,7 @@ program
   .option('--verbose', 'Debug logs')
   .option('--debug', 'Dump raw Copilot response to stderr')
   .option('--model <model>', 'Model to use (default: claude-opus-4.6)')
+  .option('--timeout <ms>', 'Timeout per Copilot call in ms (default: 300000)', parseInt)
   .option('--no-review', 'Skip the QC review agent step')
   .action(convertCommand);
 
