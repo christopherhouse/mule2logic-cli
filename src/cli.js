@@ -12,6 +12,7 @@ program
   .command('convert [input]')
   .description('Convert a MuleSoft XML flow to Logic Apps JSON')
   .option('--output <file>', 'Write JSON to file')
+  .option('--report <file>', 'Write a migration analysis report (Markdown) to file')
   .option('--explain', 'Include explanation')
   .option('--pretty', 'Pretty-print JSON')
   .option('--verbose', 'Debug logs')

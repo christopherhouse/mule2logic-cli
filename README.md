@@ -180,6 +180,12 @@ mule2logic convert flow.xml --explain --pretty
 mule2logic convert flow.xml --model gpt-4.1
 ```
 
+### Generate a migration analysis report
+
+```bash
+mule2logic convert flow.xml --output workflow.json --report migration-report.md
+```
+
 ### Skip the QC review agent
 
 ```bash
@@ -197,6 +203,7 @@ mule2logic convert big-flow.xml --timeout 600000
 | Flag | Description |
 |---|---|
 | `--output <file>` | 📁 Write JSON to a file instead of stdout |
+| `--report <file>` | 📊 Write a migration analysis report (Markdown) to a file |
 | `--explain` | 💡 Include an AI-generated explanation of the conversion |
 | `--pretty` | 🎨 Pretty-print the JSON output (2-space indent) |
 | `--verbose` | 🔍 Print debug information to stderr |
@@ -226,6 +233,8 @@ mule2logic convert hello-flow.xml --pretty
 ```json
 {
   "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "contentVersion": "1.0.0.0",
     "triggers": {
       "manual": {
         "type": "Request",
@@ -239,12 +248,15 @@ mule2logic convert hello-flow.xml --pretty
     "actions": {
       "Set_Hello": {
         "type": "Compose",
-        "inputs": "Hello"
+        "inputs": "Hello",
+        "runAfter": {}
       }
     }
   }
 }
 ```
+
+**With `--report`**, you also get a Markdown analysis file covering migration scope, confidence assessment, known gaps, and next steps.
 
 ---
 
@@ -252,19 +264,20 @@ mule2logic convert hello-flow.xml --pretty
 
 ```
                     ┌──────────────┐
-XML Input  →  io.js  →  prompt.js  →  copilot.js  →  validate.js  →  review.js  →  JSON Output
- (file          (read)    (build        (Copilot SDK    (parse &        (QC review    (stdout
-  or stdin)                prompt)       + MCP servers)   validate)       agent)        or file)
+XML Input  →  io.js  →  prompt.js  →  copilot.js  →  validate.js  →  review.js  →  report.js  →  Output
+ (file          (read)    (build        (Copilot SDK    (parse &        (QC review    (migration    (JSON +
+  or stdin)                prompt)       + MCP servers)   validate)       agent)        report)      report)
 ```
 
-The CLI follows a pipeline with a **two-pass AI architecture**:
+The CLI follows a pipeline with a **multi-pass AI architecture**:
 
 1. **📥 Load** — Read MuleSoft XML from a file or stdin (`io.js`)
 2. **📝 Prompt** — Build structured prompts from markdown templates (`prompt.js` + `prompts/`)
 3. **🤖 Convert** — Send to GitHub Copilot SDK, grounded via Microsoft Learn MCP (Logic Apps schema) and Context7 MCP (MuleSoft docs) (`copilot.js`)
 4. **✅ Validate** — Ensure the response is valid Logic Apps JSON with structural checks (`validate.js`)
 5. **🔍 Review** — A second AI pass validates semantic correctness, checks for dropped elements, and fixes issues (`review.js`)
-6. **📤 Output** — Write to stdout or a file
+6. **📤 Output** — Write workflow JSON to stdout or a file
+7. **📊 Report** *(optional)* — A third AI pass analyzes the migration and writes a Markdown report to disk (`report.js`)
 
 > If validation fails on step 4, the tool **retries once** automatically.
 
@@ -285,11 +298,14 @@ mule2logic-cli/
 │   │   ├── prompt.js          # Prompt template loader
 │   │   ├── io.js              # File and stdin reader
 │   │   ├── validate.js        # JSON structure validator
-│   │   └── review.js          # QC review agent
+│   │   ├── review.js          # QC review agent
+│   │   └── report.js          # Migration report generator
 │   └── prompts/
 │       ├── system.prompt.md   # System prompt (conversion rules)
 │       ├── user.prompt.md     # User prompt template
-│       └── review.prompt.md   # Review agent system prompt
+│       ├── review.prompt.md   # Review agent system prompt
+│       ├── report.prompt.md   # Report agent system prompt
+│       └── report.user.prompt.md  # Report user prompt template
 ├── test/
 │   ├── *.test.js              # Unit tests (Node.js test runner)
 │   └── fixtures/              # Test XML fixtures
@@ -323,6 +339,7 @@ Test coverage includes:
 - ✅ Prompt building and template loading
 - ✅ JSON validation and structural checks
 - ✅ Review agent workflow
+- ✅ Migration report generation
 
 See [test-cases.md](docs/test-cases.md) for full details.
 

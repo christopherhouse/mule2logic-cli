@@ -3,6 +3,7 @@ import { buildPrompt } from '../core/prompt.js';
 import { runCopilot, DEFAULT_MODEL, DEFAULT_TIMEOUT } from '../core/copilot.js';
 import { validateJson, validateWorkflowStructure } from '../core/validate.js';
 import { reviewWorkflow } from '../core/review.js';
+import { generateReport } from '../core/report.js';
 import { writeFile } from 'fs/promises';
 
 // ANSI color helpers
@@ -169,6 +170,23 @@ export async function convertCommand(input, options) {
       }
     } else {
       console.log(jsonString);
+    }
+
+    // 8. Generate migration report
+    if (options.report) {
+      const spinner6 = createSpinner(`${c.yellow('Generating migration report')} ${c.dim('(analyzing conversion...)')}`);
+      try {
+        const reportStart = Date.now();
+        const reportMd = await generateReport(xml, parsed, { verbose: !!options.verbose, model, timeout });
+        const reportElapsed = ((Date.now() - reportStart) / 1000).toFixed(1);
+        await writeFile(options.report, reportMd, 'utf-8');
+        spinner6.stop(`${c.green('✔')} ${c.bold('Report written to')} ${c.cyan(options.report)} ${c.dim(`(${reportElapsed}s)`)}`);
+      } catch (reportErr) {
+        spinner6.stop(`${c.yellow('⚠')}  ${c.bold('Report generation failed')} — ${reportErr.message}`);
+        if (options.verbose) {
+          console.error(`[verbose] Report error: ${reportErr.message}`);
+        }
+      }
     }
 
     console.error(`\n${c.green('🎉 Conversion complete!')}\n`);
