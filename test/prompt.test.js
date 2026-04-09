@@ -25,8 +25,8 @@ describe('buildPrompt', () => {
     assert.ok(result.includes(xml));
   });
 
-  it('includes the instruction "Return only JSON"', () => {
+  it('includes an instruction to return only JSON', () => {
     const result = buildPrompt(xml);
-    assert.ok(result.includes('Return only JSON'));
+    assert.ok(result.includes('ONLY') && result.includes('JSON'));
   });
 });

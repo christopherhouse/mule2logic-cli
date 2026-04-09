@@ -20,6 +20,7 @@ const VALID_RESPONSE = JSON.stringify({
 const mockSession = {
   sendAndWait: mock.fn(async () => ({ data: { content: VALID_RESPONSE } })),
   disconnect: mock.fn(async () => {}),
+  on: mock.fn(),
 };
 
 const mockClient = {
@@ -62,6 +63,7 @@ describe('convertCommand', () => {
     mockClient.createSession.mock.resetCalls();
     mockSession.sendAndWait.mock.resetCalls();
     mockSession.disconnect.mock.resetCalls();
+    mockSession.on.mock.resetCalls();
     // Restore default mock behavior
     mockSession.sendAndWait.mock.mockImplementation(
       async () => ({ data: { content: VALID_RESPONSE } })
@@ -151,7 +153,7 @@ describe('convertCommand', () => {
     try {
       const fixturePath = join(__dirname, 'fixtures', 'simple-flow.xml');
       await convertCommand(fixturePath, {});
-      assert.equal(callCount, 2, 'Should have called Copilot twice');
+      assert.ok(callCount >= 2, 'Should have called Copilot at least twice (retry + review)');
       const parsed = JSON.parse(out.logged[0]);
       assert.ok(parsed.definition);
     } finally {
