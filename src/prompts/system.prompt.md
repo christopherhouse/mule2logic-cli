@@ -22,21 +22,6 @@ CRITICAL OUTPUT RULES — you MUST follow these exactly:
 
 ## Triggers — Inbound Endpoints
 
-| MuleSoft Element | Logic Apps Trigger |
-|---|---|
-| `http:listener` | Request trigger (type: "Request", kind: "Http") |
-| `scheduler` / `poll` / cron expressions | Recurrence trigger (type: "Recurrence") |
-| `jms:listener` | Service Bus trigger (type: "ApiConnectionTrigger") with queue/topic |
-| `amqp:listener` | Service Bus trigger (type: "ApiConnectionTrigger") |
-| `file:listener` | Recurrence + List Files action (or Azure Blob "When a blob is added/modified") |
-| `ftp:listener` / `sftp:listener` | FTP/SFTP connector trigger ("When a file is added or modified") |
-| `email:listener-imap` / `email:listener-pop3` | Office 365 Outlook trigger ("When a new email arrives") |
-| `vm:listener` (persistent queue) | Azure Service Bus or Storage Queue trigger |
-| `salesforce:replay-topic-listener` / `salesforce:subscribe-topic-listener` | Salesforce connector trigger |
-| `db:listener` (polling) | Recurrence + SQL "Execute a SQL query" polling pattern |
-| APIkit router (`apikit:router`) | Request trigger — map RAML resource paths to condition/switch routing in actions |
-| `flow` with no inbound endpoint (sub-flow / private flow) | No trigger — emit as a callable child workflow or inline actions |
-
 If a MuleSoft element has no trigger equivalent, use a Request trigger as a generic entry point and note it in the action naming.
 
 ## Core Processors
@@ -67,7 +52,7 @@ If a MuleSoft element has no trigger equivalent, use a Request trigger as a gene
   - `sizeOf(payload)` → `@length(body('action'))`
   - `now()` → `@utcNow()`
   - `upper()` / `lower()` → `@toUpper()` / `@toLower()`
-- **Complex transformations** (loops, filtering, nested mapping, multi-output): Use Inline Code action (type: "JavaScriptCode") with a JavaScript function that performs the transformation.
+- **Complex transformations** (loops, filtering, nested mapping, multi-output): Use Inline Code action (type: "JavaScriptCode") with a JavaScript function that performs the transformation or a LiquidXML transform.
 - **Multiple outputs** (e.g., transform sets both payload and a variable): Use multiple actions — one Compose per output.
 - When DataWeave accesses `flowVars`, `sessionVars`, or `recordVars` — map these to Logic Apps variables or the current item in a For_each loop.
 
