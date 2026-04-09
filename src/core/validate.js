@@ -5,10 +5,19 @@ export function validateJson(output) {
 
   let cleaned = output.trim();
 
-  // Strip markdown code fences if present
-  const fenceMatch = cleaned.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?\s*```$/);
+  // Strategy 1: Strip markdown code fences (anywhere in the output, not just wrapping it)
+  const fenceMatch = cleaned.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
   if (fenceMatch) {
     cleaned = fenceMatch[1].trim();
+  }
+
+  // Strategy 2: If it still doesn't start with {, extract the first { ... } block
+  if (!cleaned.startsWith('{')) {
+    const startIdx = cleaned.indexOf('{');
+    const endIdx = cleaned.lastIndexOf('}');
+    if (startIdx !== -1 && endIdx > startIdx) {
+      cleaned = cleaned.slice(startIdx, endIdx + 1);
+    }
   }
 
   let parsed;

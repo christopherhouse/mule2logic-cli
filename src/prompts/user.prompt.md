@@ -6,8 +6,8 @@ Then use the Microsoft Learn MCP server to look up Azure Logic Apps schema detai
 
 Both MCP servers should always be consulted.
 
-Respond with ONLY the raw JSON object. Do NOT use markdown code fences. Do NOT include any text outside the JSON.
-
 <mulesoft-xml>
 {{xml}}
 </mulesoft-xml>
+
+REMEMBER: Your final response MUST be ONLY the raw JSON object. No explanation, no summary, no markdown, no commentary. The very first character must be { and the very last character must be }. Any text outside the JSON will cause a fatal parse error.
