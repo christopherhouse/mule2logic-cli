@@ -1,7 +1,8 @@
 import { readInput } from '../core/io.js';
 import { buildPrompt } from '../core/prompt.js';
-import { runCopilot } from '../core/copilot.js';
-import { validateJson } from '../core/validate.js';
+import { runCopilot, DEFAULT_MODEL } from '../core/copilot.js';
+import { validateJson, validateWorkflowStructure } from '../core/validate.js';
+import { reviewWorkflow } from '../core/review.js';
 import { writeFile } from 'fs/promises';
 
 // ANSI color helpers
@@ -58,6 +59,10 @@ export async function convertCommand(input, options) {
       console.error('[verbose] Prompt:\n' + prompt);
     }
     console.error(`${c.green('✔')} ${c.bold('Prompt built')}`);
+    const model = options.model || DEFAULT_MODEL;
+    if (options.verbose) {
+      console.error(`[verbose] Using model: ${model}`);
+    }
 
     // 3. Call Copilot
     if (options.verbose) {
@@ -65,7 +70,7 @@ export async function convertCommand(input, options) {
     }
     const spinner3 = createSpinner(`${c.yellow('Calling Copilot AI')} ${c.dim('(this may take a moment...)')}`);
     const startTime = Date.now();
-    let response = await runCopilot(prompt, { verbose: !!options.verbose });
+    let response = await runCopilot(prompt, { verbose: !!options.verbose, model });
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
     spinner3.stop(`${c.green('✔')} ${c.bold('Copilot responded')} ${c.dim(`(${elapsed}s)`)}`);
 
@@ -86,7 +91,7 @@ export async function convertCommand(input, options) {
         console.error(`[verbose] Validation failed: ${err.message}. Retrying...`);
       }
       const spinner4 = createSpinner(c.yellow('Retrying Copilot call...'));
-      response = await runCopilot(prompt, { verbose: !!options.verbose });
+      response = await runCopilot(prompt, { verbose: !!options.verbose, model });
       spinner4.stop(`${c.green('✔')} ${c.bold('Retry complete')}`);
       if (options.debug) {
         console.error(`\n${c.cyan('━━━ Raw Copilot Response (retry) ━━━')}`);
@@ -103,7 +108,45 @@ export async function convertCommand(input, options) {
       }
     }
 
-    // 5. Format output
+    // 5. Review agent (quality control)
+    if (!options.noReview) {
+      const structuralIssues = validateWorkflowStructure(parsed);
+      if (structuralIssues.length > 0 && options.verbose) {
+        console.error(`${c.yellow('⚠')}  Structural issues detected:`);
+        for (const issue of structuralIssues) {
+          console.error(`${c.dim('   •')} ${issue}`);
+        }
+      }
+
+      const spinner5 = createSpinner(`${c.yellow('Running QC review agent')} ${c.dim('(validating workflow...)')}`);
+      try {
+        const reviewStart = Date.now();
+        const { workflow: reviewed, issues: remainingIssues } = await reviewWorkflow(xml, parsed, { verbose: !!options.verbose, model });
+        const reviewElapsed = ((Date.now() - reviewStart) / 1000).toFixed(1);
+
+        if (remainingIssues.length > 0) {
+          spinner5.stop(`${c.yellow('⚠')}  ${c.bold('Review complete')} ${c.dim(`(${reviewElapsed}s)`)} — ${remainingIssues.length} issue(s) remain`);
+          if (options.verbose) {
+            for (const issue of remainingIssues) {
+              console.error(`${c.dim('   •')} ${issue}`);
+            }
+          }
+        } else {
+          spinner5.stop(`${c.green('✔')} ${c.bold('QC review passed')} ${c.dim(`(${reviewElapsed}s)`)}`);
+        }
+
+        parsed = reviewed;
+      } catch (reviewErr) {
+        spinner5.stop(`${c.yellow('⚠')}  ${c.bold('Review agent failed')} — using original output`);
+        if (options.verbose) {
+          console.error(`[verbose] Review error: ${reviewErr.message}`);
+        }
+      }
+    } else {
+      console.error(`${c.dim('⏭  Review skipped (--no-review)')}`);
+    }
+
+    // 6. Format output
     let output;
     if (options.explain) {
       output = { workflow: parsed, explanation: response };
@@ -115,7 +158,7 @@ export async function convertCommand(input, options) {
       ? JSON.stringify(output, null, 2)
       : JSON.stringify(output);
 
-    // 6. Write output
+    // 7. Write output
     if (options.output) {
       await writeFile(options.output, jsonString, 'utf-8');
       console.error(`${c.green('✔')} ${c.bold('Written to')} ${c.cyan(options.output)}`);

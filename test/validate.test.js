@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { validateJson } from '../src/core/validate.js';
+import { validateJson, validateWorkflowStructure } from '../src/core/validate.js';
 
 const validJson = JSON.stringify({
   definition: {
@@ -48,5 +48,90 @@ describe('validateJson', () => {
     const wrapped = '```\n' + validJson + '\n```';
     const result = validateJson(wrapped);
     assert.equal(result.definition.actions.Compose.inputs, 'Hello');
+  });
+});
+
+describe('validateWorkflowStructure', () => {
+  it('returns empty array for a valid workflow', () => {
+    const parsed = JSON.parse(validJson);
+    const issues = validateWorkflowStructure(parsed);
+    assert.deepEqual(issues, []);
+  });
+
+  it('detects action missing type field', () => {
+    const parsed = {
+      definition: {
+        triggers: {},
+        actions: {
+          BadAction: { inputs: 'test' }
+        }
+      }
+    };
+    const issues = validateWorkflowStructure(parsed);
+    assert.ok(issues.some(i => i.includes('BadAction') && i.includes('type')));
+  });
+
+  it('detects trigger missing type field', () => {
+    const parsed = {
+      definition: {
+        triggers: { badTrigger: { kind: 'Http' } },
+        actions: { A: { type: 'Compose' } }
+      }
+    };
+    const issues = validateWorkflowStructure(parsed);
+    assert.ok(issues.some(i => i.includes('badTrigger') && i.includes('type')));
+  });
+
+  it('detects invalid runAfter references', () => {
+    const parsed = {
+      definition: {
+        triggers: {},
+        actions: {
+          Step1: { type: 'Compose', inputs: 'x' },
+          Step2: { type: 'Compose', inputs: 'y', runAfter: { NonExistent: ['Succeeded'] } }
+        }
+      }
+    };
+    const issues = validateWorkflowStructure(parsed);
+    assert.ok(issues.some(i => i.includes('NonExistent') && i.includes('runAfter')));
+  });
+
+  it('detects Condition action missing expression', () => {
+    const parsed = {
+      definition: {
+        triggers: {},
+        actions: {
+          MyCondition: { type: 'If', actions: {} }
+        }
+      }
+    };
+    const issues = validateWorkflowStructure(parsed);
+    assert.ok(issues.some(i => i.includes('MyCondition') && i.includes('expression')));
+  });
+
+  it('detects Foreach action missing foreach input', () => {
+    const parsed = {
+      definition: {
+        triggers: {},
+        actions: {
+          MyLoop: { type: 'Foreach', actions: {} }
+        }
+      }
+    };
+    const issues = validateWorkflowStructure(parsed);
+    assert.ok(issues.some(i => i.includes('MyLoop') && i.includes('foreach')));
+  });
+
+  it('detects Foreach action missing nested actions', () => {
+    const parsed = {
+      definition: {
+        triggers: {},
+        actions: {
+          MyLoop: { type: 'Foreach', foreach: '@triggerBody()' }
+        }
+      }
+    };
+    const issues = validateWorkflowStructure(parsed);
+    assert.ok(issues.some(i => i.includes('MyLoop') && i.includes('actions')));
   });
 });

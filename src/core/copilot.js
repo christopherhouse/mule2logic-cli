@@ -1,7 +1,9 @@
 import { CopilotClient, approveAll } from '@github/copilot-sdk';
 import { SYSTEM_PROMPT } from './prompt.js';
 
-export async function runCopilot(prompt, { verbose = false } = {}) {
+export const DEFAULT_MODEL = 'claude-opus-4.6';
+
+export async function runCopilot(prompt, { verbose = false, systemPrompt = SYSTEM_PROMPT, model = DEFAULT_MODEL } = {}) {
   const client = new CopilotClient();
 
   try {
@@ -9,9 +11,10 @@ export async function runCopilot(prompt, { verbose = false } = {}) {
 
     const session = await client.createSession({
       onPermissionRequest: approveAll,
+      model,
       systemMessage: {
         mode: 'replace',
-        content: SYSTEM_PROMPT,
+        content: systemPrompt,
       },
       mcpServers: {
         learn: {

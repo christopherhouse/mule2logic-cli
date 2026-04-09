@@ -16,6 +16,8 @@ program
   .option('--pretty', 'Pretty-print JSON')
   .option('--verbose', 'Debug logs')
   .option('--debug', 'Dump raw Copilot response to stderr')
+  .option('--model <model>', 'Model to use (default: claude-opus-4.6)')
+  .option('--no-review', 'Skip the QC review agent step')
   .action(convertCommand);
 
 program.parse();
