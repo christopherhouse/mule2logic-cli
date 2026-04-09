@@ -1,0 +1,31 @@
+{
+  "name": "mule2logic-cli",
+  "version": "1.0.0",
+  "description": "Migrate MuleSoft flows to Azure Logic Apps Standard workflows with AI!",
+  "main": "src/cli.js",
+  "bin": {
+    "mule2logic": "./src/cli.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "start": "node src/cli.js",
+    "test": "node --test test/**/*.test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/christopherhouse/mule2logic-cli.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/christopherhouse/mule2logic-cli/issues"
+  },
+  "homepage": "https://github.com/christopherhouse/mule2logic-cli#readme",
+  "dependencies": {
+    "commander": "^14.0.3"
+  }
+}
