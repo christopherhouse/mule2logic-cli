@@ -9,7 +9,7 @@ program
   .version('1.0.0');
 
 program
-  .command('convert <input>')
+  .command('convert [input]')
   .description('Convert a MuleSoft XML flow to Logic Apps JSON')
   .option('--output <file>', 'Write JSON to file')
   .option('--explain', 'Include explanation')
