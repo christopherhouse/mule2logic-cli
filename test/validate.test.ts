@@ -67,8 +67,8 @@ describe('validateWorkflowStructure', () => {
         }
       }
     };
-    const issues = validateWorkflowStructure(parsed);
-    assert.ok(issues.some(i => i.includes('BadAction') && i.includes('type')));
+    const issues = validateWorkflowStructure(parsed as any);
+    assert.ok(issues.some((i: string) => i.includes('BadAction') && i.includes('type')));
   });
 
   it('detects trigger missing type field', () => {
@@ -78,8 +78,8 @@ describe('validateWorkflowStructure', () => {
         actions: { A: { type: 'Compose' } }
       }
     };
-    const issues = validateWorkflowStructure(parsed);
-    assert.ok(issues.some(i => i.includes('badTrigger') && i.includes('type')));
+    const issues = validateWorkflowStructure(parsed as any);
+    assert.ok(issues.some((i: string) => i.includes('badTrigger') && i.includes('type')));
   });
 
   it('detects invalid runAfter references', () => {
@@ -92,8 +92,8 @@ describe('validateWorkflowStructure', () => {
         }
       }
     };
-    const issues = validateWorkflowStructure(parsed);
-    assert.ok(issues.some(i => i.includes('NonExistent') && i.includes('runAfter')));
+    const issues = validateWorkflowStructure(parsed as any);
+    assert.ok(issues.some((i: string) => i.includes('NonExistent') && i.includes('runAfter')));
   });
 
   it('detects Condition action missing expression', () => {
@@ -105,8 +105,8 @@ describe('validateWorkflowStructure', () => {
         }
       }
     };
-    const issues = validateWorkflowStructure(parsed);
-    assert.ok(issues.some(i => i.includes('MyCondition') && i.includes('expression')));
+    const issues = validateWorkflowStructure(parsed as any);
+    assert.ok(issues.some((i: string) => i.includes('MyCondition') && i.includes('expression')));
   });
 
   it('detects Foreach action missing foreach input', () => {
@@ -118,8 +118,8 @@ describe('validateWorkflowStructure', () => {
         }
       }
     };
-    const issues = validateWorkflowStructure(parsed);
-    assert.ok(issues.some(i => i.includes('MyLoop') && i.includes('foreach')));
+    const issues = validateWorkflowStructure(parsed as any);
+    assert.ok(issues.some((i: string) => i.includes('MyLoop') && i.includes('foreach')));
   });
 
   it('detects Foreach action missing nested actions', () => {
@@ -131,7 +131,7 @@ describe('validateWorkflowStructure', () => {
         }
       }
     };
-    const issues = validateWorkflowStructure(parsed);
-    assert.ok(issues.some(i => i.includes('MyLoop') && i.includes('actions')));
+    const issues = validateWorkflowStructure(parsed as any);
+    assert.ok(issues.some((i: string) => i.includes('MyLoop') && i.includes('actions')));
   });
 });

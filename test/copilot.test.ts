@@ -1,4 +1,4 @@
-import { describe, it, mock, beforeEach, afterEach } from 'node:test';
+import { describe, it, mock, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 
 const MOCK_JSON = JSON.stringify({
@@ -26,7 +26,7 @@ const mockClient = {
   createSession: mock.fn(async () => mockSession),
 };
 
-// Mock the SDK module before importing copilot.js
+// Mock the SDK module before importing copilot.ts
 mock.module('@github/copilot-sdk', {
   namedExports: {
     CopilotClient: class {

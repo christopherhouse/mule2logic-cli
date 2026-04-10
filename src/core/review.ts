@@ -3,6 +3,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { runCopilot } from './copilot.js';
 import { validateJson, validateWorkflowStructure } from './validate.js';
+import type { WorkflowDefinition } from './validate.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REVIEW_PROMPT = readFileSync(
@@ -10,12 +11,27 @@ const REVIEW_PROMPT = readFileSync(
   'utf-8'
 ).trim();
 
+export interface ReviewOptions {
+  verbose?: boolean;
+  model?: string;
+  timeout?: number;
+}
+
+export interface ReviewResult {
+  workflow: WorkflowDefinition;
+  issues: string[];
+}
+
 /**
  * Runs the review agent: sends the original XML + generated JSON back through
  * Copilot with a validation-focused system prompt. Returns the (possibly corrected)
  * parsed workflow object.
  */
-export async function reviewWorkflow(xml, parsed, { verbose = false, model, timeout } = {}) {
+export async function reviewWorkflow(
+  xml: string,
+  parsed: WorkflowDefinition,
+  { verbose = false, model, timeout }: ReviewOptions = {}
+): Promise<ReviewResult> {
   const structuralIssues = validateWorkflowStructure(parsed);
 
   if (structuralIssues.length === 0) {
@@ -53,7 +69,7 @@ export async function reviewWorkflow(xml, parsed, { verbose = false, model, time
   return { workflow: reviewed, issues: postReviewIssues };
 }
 
-function buildReviewPrompt(xml, parsed, issues) {
+function buildReviewPrompt(xml: string, parsed: WorkflowDefinition, issues: string[]): string {
   let prompt = `Review and validate this Azure Logic Apps workflow that was converted from MuleSoft XML.
 
 <original-mulesoft-xml>
