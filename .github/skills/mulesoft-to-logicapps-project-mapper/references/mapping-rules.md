@@ -14,10 +14,12 @@
 
 Use this preference order:
 
-1. **Built-in Logic Apps Standard connectors** — first choice when available
-2. **Managed connectors** — second choice
-3. **Azure Functions / custom code** — for unsupported logic
-4. **Custom connectors** — only when no native option exists and HTTP abstraction is stable
+1. **Built-in / in-app Logic Apps Standard connectors** — ALWAYS prefer these. They run in-process, have lower latency, and do not require a separate API connection.
+2. **Azure Functions / custom code** — for logic that has no built-in connector equivalent.
+3. **Managed / API connectors** — LAST RESORT only. Use only when no built-in connector exists and an Azure Function wrapper is impractical. Managed connectors run out-of-process and incur additional cost and latency.
+4. **Custom connectors** — only when the target system has no native option and HTTP abstraction is stable.
+
+> **Key rule:** If a built-in (in-app) connector exists for a given system, you MUST use it instead of the managed (API) connector, even if both are available.
 
 Common connector mappings:
 
@@ -63,6 +65,16 @@ Common connector mappings:
 | Global error handler | Top-level scope wrapping all actions |
 | Raise error | Terminate action with `Failed` status |
 
+## Authentication Mapping
+
+Use this preference order for connection authentication:
+
+1. **Managed Identity** — ALWAYS prefer system-assigned or user-assigned managed identity where the target connector supports it. This eliminates credential management and is the most secure option.
+2. **Key Vault references** — for secrets that cannot use managed identity (e.g., third-party API keys, on-prem credentials).
+3. **Connection strings / raw credentials** — LAST RESORT. Only when managed identity and Key Vault are not supported.
+
+> **Key rule:** When mapping a Mule connection config to Logic Apps, default the `authenticationModel` to `ManagedIdentity` unless there is a clear reason the target connector does not support it.
+
 ## Configuration Mapping
 
 | MuleSoft Source | Logic Apps Target |
@@ -72,7 +84,7 @@ Common connector mappings:
 | Secure properties | Key Vault references or secure parameters |
 | Connection configs (global elements) | `connections.json` entries |
 | Endpoint URLs | App settings or parameters |
-| Credentials | Key Vault references |
+| Credentials | Managed Identity where supported, otherwise Key Vault references |
 | Feature toggles | App settings with parameter references |
 
 ## Decision Heuristics

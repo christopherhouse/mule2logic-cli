@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { validateJson, validateWorkflowStructure } from '../src/core/validate.js';
+import { validateJson, validateWorkflowStructure, validateConversionModel } from '../src/core/validate.js';
 
 const validJson = JSON.stringify({
   definition: {
@@ -133,5 +133,138 @@ describe('validateWorkflowStructure', () => {
     };
     const issues = validateWorkflowStructure(parsed as any);
     assert.ok(issues.some((i: string) => i.includes('MyLoop') && i.includes('actions')));
+  });
+});
+
+// --- Conversion Model validation ---
+
+const validModel = JSON.stringify({
+  assessmentVersion: '1.0',
+  source: {
+    rootPath: '/test/project',
+    applications: [{
+      name: 'test-app',
+      files: ['src/main/mule/flow.xml'],
+      flows: [{ name: 'main-flow', file: 'flow.xml', triggerType: 'http-listener', operations: [] }],
+      dependencies: [],
+      transforms: [],
+    }],
+  },
+  target: {
+    logicAppsStandardApps: [{
+      name: 'test-logic-app',
+      workflows: [{
+        name: 'MainFlow',
+        sourceArtifacts: ['src/main/mule/flow.xml'],
+        trigger: { type: 'Request' },
+        actionsSummary: ['Compose'],
+        recommendedImplementation: 'workflow',
+        riskLevel: 'low',
+      }],
+      connections: [],
+    }],
+  },
+  executionPlan: {
+    phases: [{
+      phase: 1,
+      name: 'Discovery',
+      tasks: [{ id: 'P1-T1', title: 'Scan files' }],
+    }],
+  },
+});
+
+describe('validateConversionModel', () => {
+  it('parses a valid conversion model', () => {
+    const result = validateConversionModel(validModel);
+    assert.equal(result.assessmentVersion, '1.0');
+    assert.equal(result.source.applications.length, 1);
+    assert.equal(result.target.logicAppsStandardApps.length, 1);
+    assert.equal(result.executionPlan.phases.length, 1);
+  });
+
+  it('throws on empty string', () => {
+    assert.throws(() => validateConversionModel(''), {
+      message: 'Output is empty or not a string',
+    });
+  });
+
+  it('throws on non-JSON', () => {
+    assert.throws(() => validateConversionModel('not json'), {
+      message: 'Output is not valid JSON',
+    });
+  });
+
+  it('throws when assessmentVersion is missing', () => {
+    const bad = JSON.stringify({ source: {}, target: {}, executionPlan: {} });
+    assert.throws(() => validateConversionModel(bad), {
+      message: 'Missing required "assessmentVersion" property',
+    });
+  });
+
+  it('throws when source is missing', () => {
+    const bad = JSON.stringify({ assessmentVersion: '1.0', target: {}, executionPlan: {} });
+    assert.throws(() => validateConversionModel(bad), {
+      message: 'Missing required "source" property',
+    });
+  });
+
+  it('throws when source.applications is empty', () => {
+    const bad = JSON.stringify({
+      assessmentVersion: '1.0',
+      source: { applications: [] },
+      target: { logicAppsStandardApps: [{ name: 'x', workflows: [] }] },
+      executionPlan: { phases: [{ phase: 1, name: 'x', tasks: [] }] },
+    });
+    assert.throws(() => validateConversionModel(bad), {
+      message: 'Missing or empty "source.applications" array',
+    });
+  });
+
+  it('throws when target.logicAppsStandardApps is missing', () => {
+    const bad = JSON.stringify({
+      assessmentVersion: '1.0',
+      source: { applications: [{ name: 'x' }] },
+      target: {},
+      executionPlan: { phases: [{ phase: 1 }] },
+    });
+    assert.throws(() => validateConversionModel(bad), {
+      message: 'Missing or empty "target.logicAppsStandardApps" array',
+    });
+  });
+
+  it('throws when executionPlan.phases is empty', () => {
+    const bad = JSON.stringify({
+      assessmentVersion: '1.0',
+      source: { applications: [{ name: 'x' }] },
+      target: { logicAppsStandardApps: [{ name: 'x', workflows: [] }] },
+      executionPlan: { phases: [] },
+    });
+    assert.throws(() => validateConversionModel(bad), {
+      message: 'Missing or empty "executionPlan.phases" array',
+    });
+  });
+
+  it('throws when a target app has no name', () => {
+    const bad = JSON.stringify({
+      assessmentVersion: '1.0',
+      source: { applications: [{ name: 'x' }] },
+      target: { logicAppsStandardApps: [{ workflows: [] }] },
+      executionPlan: { phases: [{ phase: 1, name: 'x', tasks: [] }] },
+    });
+    assert.throws(() => validateConversionModel(bad), {
+      message: 'Target app is missing "name" property',
+    });
+  });
+
+  it('handles JSON wrapped in markdown code fences', () => {
+    const wrapped = '```json\n' + validModel + '\n```';
+    const result = validateConversionModel(wrapped);
+    assert.equal(result.assessmentVersion, '1.0');
+  });
+
+  it('extracts JSON from surrounding text', () => {
+    const wrapped = 'Here is the model:\n' + validModel + '\nDone.';
+    const result = validateConversionModel(wrapped);
+    assert.equal(result.assessmentVersion, '1.0');
   });
 });

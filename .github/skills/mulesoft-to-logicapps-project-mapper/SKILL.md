@@ -66,9 +66,10 @@ Apply the mapping rules in [mapping rules](./references/mapping-rules.md) to det
 - **One Mule app → one Logic Apps Standard app** (split only at clear operational/security boundaries)
 - **Flow with trigger → Logic Apps workflow**
 - **Subflow → child workflow, inline scope, Azure Function, or shared component** (state which and why)
-- **Connectors → built-in first, managed second, Azure Functions third, custom connectors last**
+- **Connectors → built-in/in-app ALWAYS first, Azure Functions second, managed/API connectors as last resort, custom connectors only when no other option**
 - **Transforms → WDL expressions for simple, Liquid/XSLT for medium, Azure Functions for complex**
 - **Error handling → runAfter, scope try/catch, retry policies, terminate/dead-letter patterns**
+- **Auth → prefer managed identity for all connections where supported; fall back to Key Vault references; raw credentials as last resort**
 - **Config → app settings, workflow parameters, connections.json, Key Vault references**
 
 ### Step 4 — Identify risks and unknowns
