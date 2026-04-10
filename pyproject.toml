@@ -3,7 +3,7 @@ name = "mule2logic"
 version = "2.0.0"
 description = "Migrate MuleSoft flows to Azure Logic Apps Standard workflows with AI — powered by Microsoft Agent Framework"
 readme = "README.md"
-license = "ISC"
+license = "MIT"
 requires-python = ">=3.12"
 authors = [
     { name = "Christopher House" },

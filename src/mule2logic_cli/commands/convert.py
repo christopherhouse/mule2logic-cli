@@ -11,7 +11,6 @@ from typing import Any
 
 from mule2logic_agent.core.io import read_input
 from mule2logic_agent.core.prompt import build_prompt
-from mule2logic_agent.core.validate import validate_json, validate_workflow_structure
 from mule2logic_agent.models import ConvertRequest
 from mule2logic_agent.service import convert
 from mule2logic_cli.display import (
@@ -120,7 +119,7 @@ async def _convert_async(args: Any) -> None:
         if args.explain:
             output: dict[str, Any] = {
                 "workflow": result.workflow,
-                "explanation": result.raw_response,
+                "explanation": result.explanation,
             }
         else:
             output = result.workflow

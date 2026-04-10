@@ -6,7 +6,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Agent Framework](https://img.shields.io/badge/Microsoft-Agent%20Framework-0078D4?logo=microsoftazure&logoColor=white)](https://learn.microsoft.com/agent-framework/)
-[![License: ISC](https://img.shields.io/badge/License-ISC-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/christopherhouse/mule2logic-cli/pulls)
 [![Experimental](https://img.shields.io/badge/Status-Experimental-orange)]()
 
@@ -433,7 +433,7 @@ Contributions are welcome! Here's how to get started:
 
 ## 📜 License
 
-This project is licensed under the **ISC License** — see the [LICENSE](LICENSE) file for details.
+This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
 
 ---
 

@@ -43,6 +43,9 @@ def validate_json(output: str) -> WorkflowDefinition:
     if not isinstance(parsed.get("definition"), dict):
         raise ValueError('Missing required "definition" property')
 
+    if not isinstance(parsed["definition"].get("triggers"), dict):
+        raise ValueError('Missing required "definition.triggers" property')
+
     if not isinstance(parsed["definition"].get("actions"), dict):
         raise ValueError('Missing required "definition.actions" property')
 
@@ -59,7 +62,9 @@ def validate_workflow_structure(parsed: WorkflowDefinition) -> list[str]:
 
     # Check triggers
     triggers = definition.get("triggers")
-    if isinstance(triggers, dict):
+    if not isinstance(triggers, dict):
+        issues.append('Missing required "definition.triggers" property')
+    else:
         for name, trigger in triggers.items():
             if not isinstance(trigger, dict) or not isinstance(
                 trigger.get("type"), str

@@ -72,7 +72,32 @@ async def convert(request: ConvertRequest) -> ConvertResult:
             # Review failure is non-fatal; keep original output
             review_issues = validate_workflow_structure(parsed)
 
-    # 5. Migration report (optional)
+    # 5. Explanation (optional)
+    explanation = ""
+    if request.include_explanation:
+        try:
+            explain_prompt = (
+                "You are a MuleSoft-to-Azure migration expert.\n\n"
+                "Given the original MuleSoft XML and the converted Logic Apps JSON below, "
+                "provide a clear, concise explanation of the conversion.  Describe what each "
+                "MuleSoft element was mapped to, any assumptions made, and anything the user "
+                "should review or adjust.\n\n"
+                "## MuleSoft XML\n```xml\n" + request.xml + "\n```\n\n"
+                "## Logic Apps JSON\n```json\n" + json.dumps(parsed, indent=2) + "\n```\n\n"
+                "Respond with the explanation text only — no JSON, no code fences."
+            )
+            explanation = await run_agent(
+                explain_prompt,
+                system_prompt="You are a helpful migration assistant.  "
+                "Respond with plain text only.",
+                model=model,
+                timeout=timeout,
+                verbose=verbose,
+            )
+        except Exception:
+            explanation = ""
+
+    # 6. Migration report (optional)
     report = ""
     if request.generate_report:
         try:
@@ -89,6 +114,7 @@ async def convert(request: ConvertRequest) -> ConvertResult:
     return ConvertResult(
         workflow=parsed,
         raw_response=raw_response,
+        explanation=explanation,
         review_issues=review_issues,
         report=report,
     )

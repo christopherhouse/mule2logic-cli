@@ -40,8 +40,9 @@ class ConvertRequest:
     xml: str
     """Raw MuleSoft XML to convert."""
 
-    model: str = "gpt-4o"
-    """Foundry model deployment name."""
+    model: str = ""
+    """Foundry model deployment name.  Empty string means use the
+    ``FOUNDRY_MODEL`` env-var (or fall back to ``gpt-4o``)."""
 
     timeout: float = 300.0
     """Maximum seconds per agent call."""
@@ -67,7 +68,10 @@ class ConvertResult:
     """The validated Logic Apps workflow JSON."""
 
     raw_response: str = ""
-    """The raw text returned by the LLM (useful for --explain / --debug)."""
+    """The raw text returned by the LLM (useful for --debug)."""
+
+    explanation: str = ""
+    """Human-readable explanation of the conversion (populated when requested)."""
 
     review_issues: list[str] = field(default_factory=list)
     """Structural issues remaining after the QC review pass."""

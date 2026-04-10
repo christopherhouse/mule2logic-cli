@@ -34,9 +34,13 @@ class TestValidateJson:
         with pytest.raises(ValueError, match='Missing required "definition"'):
             validate_json('{"foo": "bar"}')
 
+    def test_raises_on_missing_triggers(self):
+        with pytest.raises(ValueError, match='Missing required "definition.triggers"'):
+            validate_json('{"definition": {}}')
+
     def test_raises_on_missing_actions(self):
         with pytest.raises(ValueError, match='Missing required "definition.actions"'):
-            validate_json('{"definition": {}}')
+            validate_json('{"definition": {"triggers": {}}}')
 
     def test_handles_markdown_code_fences_json(self):
         wrapped = f"```json\n{VALID_JSON}\n```"
@@ -66,6 +70,15 @@ class TestValidateWorkflowStructure:
     def test_returns_empty_for_valid_workflow(self):
         issues = validate_workflow_structure(VALID_WORKFLOW)
         assert issues == []
+
+    def test_detects_missing_triggers(self):
+        parsed = {
+            "definition": {
+                "actions": {"A": {"type": "Compose"}},
+            }
+        }
+        issues = validate_workflow_structure(parsed)
+        assert any("triggers" in i for i in issues)
 
     def test_detects_action_missing_type(self):
         parsed = {

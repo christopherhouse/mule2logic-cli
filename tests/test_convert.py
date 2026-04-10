@@ -32,6 +32,7 @@ def _make_convert_result(**overrides):
     defaults = dict(
         workflow=VALID_WORKFLOW,
         raw_response=VALID_RESPONSE,
+        explanation="",
         review_issues=[],
         report="",
     )
@@ -82,7 +83,9 @@ class TestConvertCommand:
 
     @patch("mule2logic_cli.commands.convert.convert", new_callable=AsyncMock)
     async def test_explain_wraps_output(self, mock_convert, capsys):
-        mock_convert.return_value = _make_convert_result()
+        mock_convert.return_value = _make_convert_result(
+            explanation="This is the explanation text."
+        )
         fixture = str(Path(__file__).parent / "fixtures" / "simple-flow.xml")
         args = _FakeArgs(input=fixture, explain=True)
         await _convert_async(args)
@@ -90,6 +93,7 @@ class TestConvertCommand:
         parsed = json.loads(captured.out)
         assert "workflow" in parsed
         assert "explanation" in parsed
+        assert parsed["explanation"] == "This is the explanation text."
         assert parsed["workflow"]["definition"]
 
     @patch("mule2logic_cli.commands.convert.convert", new_callable=AsyncMock)
