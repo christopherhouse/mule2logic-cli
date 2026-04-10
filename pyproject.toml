@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mule2logic"
+version = "2.0.0"
+description = "Migrate MuleSoft flows to Azure Logic Apps Standard workflows with AI — powered by Microsoft Agent Framework"
+readme = "README.md"
+license = "ISC"
+requires-python = ">=3.12"
+authors = [
+    { name = "Christopher House" },
+]
+keywords = [
+    "mulesoft",
+    "azure",
+    "logic-apps",
+    "migration",
+    "cli",
+    "agent-framework",
+    "foundry",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Code Generators",
+]
+
+dependencies = [
+    "agent-framework>=1.0.0a1",
+    "azure-identity>=1.19.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+]
+
+[project.scripts]
+mule2logic = "mule2logic_cli.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+mule2logic_agent = ["prompts/*.md"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

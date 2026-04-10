@@ -1,9 +1,14 @@
-# Dependencies
-node_modules/
-
-# Build output
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
 dist/
 build/
+.venv/
+venv/
+.eggs/
 
 # Environment
 .env
@@ -12,7 +17,6 @@ build/
 
 # Logs
 *.log
-npm-debug.log*
 
 # OS files
 .DS_Store
@@ -26,7 +30,12 @@ Thumbs.db
 
 # Coverage
 coverage/
-.nyc_output/
+.coverage
+htmlcov/
+
+# Testing
+.pytest_cache/
+.mypy_cache/
 
 # Temporary files
 tmp/
