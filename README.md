@@ -131,92 +131,107 @@ Content-based routing, message enrichment, splitter/aggregator, idempotent filte
 
 ### Prerequisites
 
-- **Python 3.12+** — [Download](https://www.python.org/downloads/)
+- **[uv](https://docs.astral.sh/uv/)** — Python package & project manager (handles Python installation too)
 - **Azure AI Foundry project** — with a deployed model (e.g., `gpt-4o`)
 - **Azure CLI** — logged in via `az login` (for authentication)
 
-### Environment Variables
+### 1. Install uv
+
+If you don't already have [uv](https://docs.astral.sh/uv/), install it first:
+
+```bash
+# macOS / Linux
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Windows (PowerShell)
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+> **Note:** uv will manage the Python installation for you — no need to install Python separately.
+
+### 2. Clone and sync
+
+```bash
+git clone https://github.com/christopherhouse/mule2logic-cli.git
+cd mule2logic-cli
+
+# Install all dependencies (creates .venv automatically)
+uv sync
+```
+
+### 3. Set environment variables
 
 ```bash
 export FOUNDRY_PROJECT_ENDPOINT="https://your-project.services.ai.azure.com"
 export FOUNDRY_MODEL="gpt-4o"  # optional, defaults to gpt-4o
 ```
 
-### Installation
-
-#### Option 1: Install from source (editable)
+### 4. Authenticate with Azure
 
 ```bash
-git clone https://github.com/christopherhouse/mule2logic-cli.git
-cd mule2logic-cli
+az login
+```
 
-# Install uv if you don't have it (https://docs.astral.sh/uv/)
-# curl -LsSf https://astral.sh/uv/install.sh | sh
+### 5. Run it
 
-# Sync dependencies (creates venv automatically)
-uv sync
-
-# Now available:
+```bash
 uv run mule2logic convert flow.xml --pretty
 ```
 
-#### Option 2: Install directly via uv
-
-```bash
-uv tool install mule2logic
-mule2logic convert flow.xml --pretty
-```
+That's it — `uv run` ensures the CLI runs inside the project's virtual environment with all dependencies available.
 
 ---
 
 ## 🚀 Usage
 
+All examples below use `uv run` to invoke the CLI from your local clone.  If you installed the package globally (e.g., via `uv tool install mule2logic`), you can drop the `uv run` prefix.
+
 ### Basic conversion
 
 ```bash
-mule2logic convert flow.xml
+uv run mule2logic convert flow.xml
 ```
 
 ### Pipe XML from stdin
 
 ```bash
-cat flow.xml | mule2logic convert
+cat flow.xml | uv run mule2logic convert
 ```
 
 ### Save to a file with pretty-printing
 
 ```bash
-mule2logic convert flow.xml --output workflow.json --pretty
+uv run mule2logic convert flow.xml --output workflow.json --pretty
 ```
 
 ### Get an AI explanation of the conversion
 
 ```bash
-mule2logic convert flow.xml --explain --pretty
+uv run mule2logic convert flow.xml --explain --pretty
 ```
 
 ### Use a different model
 
 ```bash
-mule2logic convert flow.xml --model gpt-4.1
+uv run mule2logic convert flow.xml --model gpt-4.1
 ```
 
 ### Generate a migration analysis report
 
 ```bash
-mule2logic convert flow.xml --output workflow.json --report migration-report.md
+uv run mule2logic convert flow.xml --output workflow.json --report migration-report.md
 ```
 
 ### Skip the QC review agent
 
 ```bash
-mule2logic convert flow.xml --no-review
+uv run mule2logic convert flow.xml --no-review
 ```
 
 ### Increase timeout for large flows
 
 ```bash
-mule2logic convert big-flow.xml --timeout 600
+uv run mule2logic convert big-flow.xml --timeout 600
 ```
 
 ### 🎛️ All CLI Flags
@@ -247,7 +262,7 @@ mule2logic convert big-flow.xml --timeout 600
 
 **Command:**
 ```bash
-mule2logic convert hello-flow.xml --pretty
+uv run mule2logic convert hello-flow.xml --pretty
 ```
 
 **Output:**
