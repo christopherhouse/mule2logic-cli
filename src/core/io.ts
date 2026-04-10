@@ -1,21 +1,21 @@
 import { readFile } from 'fs/promises';
 
-async function readStdin() {
-  const chunks = [];
+async function readStdin(): Promise<string> {
+  const chunks: Buffer[] = [];
   for await (const chunk of process.stdin) {
-    chunks.push(chunk);
+    chunks.push(chunk as Buffer);
   }
-  return Buffer.concat(chunks).toString("utf-8");
+  return Buffer.concat(chunks).toString('utf-8');
 }
 
-export async function readInput(filePath) {
-  let content;
+export async function readInput(filePath?: string): Promise<string> {
+  let content: string;
 
   if (filePath) {
     try {
       content = await readFile(filePath, 'utf-8');
-    } catch (err) {
-      if (err.code === 'ENOENT') {
+    } catch (err: unknown) {
+      if (err instanceof Error && (err as NodeJS.ErrnoException).code === 'ENOENT') {
         throw new Error(`File not found: ${filePath}`);
       }
       throw err;

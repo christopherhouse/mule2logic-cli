@@ -40,12 +40,12 @@ const { convertCommand } = await import('../src/commands/convert.js');
 
 // Capture stdout and stderr
 function captureOutput() {
-  const logged = [];
-  const errors = [];
+  const logged: string[] = [];
+  const errors: string[] = [];
   const origLog = console.log;
   const origErr = console.error;
-  console.log = (...args) => logged.push(args.join(' '));
-  console.error = (...args) => errors.push(args.join(' '));
+  console.log = (...args: unknown[]) => logged.push(args.map(String).join(' '));
+  console.error = (...args: unknown[]) => errors.push(args.map(String).join(' '));
   return {
     logged,
     errors,
@@ -114,8 +114,7 @@ describe('convertCommand', () => {
   });
 
   it('writes to file when --output is set', async () => {
-    const { writeFile, unlink } = await import('node:fs/promises');
-    const { readFile } = await import('node:fs/promises');
+    const { unlink, readFile } = await import('node:fs/promises');
     const outPath = join(__dirname, 'fixtures', '_test_output.json');
     try {
       await convertCommand(join(__dirname, 'fixtures', 'simple-flow.xml'), { output: outPath });
@@ -164,18 +163,18 @@ describe('convertCommand', () => {
   it('exits with code 1 when file is missing', async () => {
     const out = captureOutput();
     const origExit = process.exit;
-    let exitCode;
-    process.exit = (code) => { exitCode = code; throw new Error('EXIT'); };
+    let exitCode: number | undefined;
+    process.exit = ((code: number) => { exitCode = code; throw new Error('EXIT'); }) as never;
     try {
       await convertCommand('/no/such/file.xml', {});
     } catch (e) {
-      if (e.message !== 'EXIT') throw e;
+      if ((e as Error).message !== 'EXIT') throw e;
     } finally {
       process.exit = origExit;
       out.restore();
     }
     assert.equal(exitCode, 1);
-    assert.ok(out.errors.some(e => e.includes('File not found')));
+    assert.ok(out.errors.some((e: string) => e.includes('File not found')));
   });
 
   it('exits with code 1 after retry fails with invalid JSON', async () => {
@@ -185,18 +184,18 @@ describe('convertCommand', () => {
 
     const out = captureOutput();
     const origExit = process.exit;
-    let exitCode;
-    process.exit = (code) => { exitCode = code; throw new Error('EXIT'); };
+    let exitCode: number | undefined;
+    process.exit = ((code: number) => { exitCode = code; throw new Error('EXIT'); }) as never;
     try {
       const fixturePath = join(__dirname, 'fixtures', 'simple-flow.xml');
       await convertCommand(fixturePath, {});
     } catch (e) {
-      if (e.message !== 'EXIT') throw e;
+      if ((e as Error).message !== 'EXIT') throw e;
     } finally {
       process.exit = origExit;
       out.restore();
     }
     assert.equal(exitCode, 1);
-    assert.ok(out.errors.some(e => e.includes('Invalid JSON output after retry')));
+    assert.ok(out.errors.some((e: string) => e.includes('Invalid JSON output after retry')));
   });
 });

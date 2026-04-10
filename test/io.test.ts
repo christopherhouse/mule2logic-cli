@@ -25,7 +25,6 @@ describe('readInput', () => {
 
   it('throws an error for empty input', async () => {
     const emptyFixture = join(__dirname, 'fixtures', 'empty.xml');
-    // Create empty file inline for this test
     const { writeFile, unlink } = await import('node:fs/promises');
     await writeFile(emptyFixture, '   ');
     try {

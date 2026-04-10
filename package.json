@@ -2,22 +2,37 @@
   "name": "mule2logic-cli",
   "version": "1.0.0",
   "description": "Migrate MuleSoft flows to Azure Logic Apps Standard workflows with AI!",
-  "main": "src/cli.js",
+  "main": "dist/cli.js",
   "bin": {
-    "mule2logic": "./src/cli.js"
+    "mule2logic": "dist/cli.js"
   },
   "engines": {
     "node": ">=18.0.0"
   },
+  "files": [
+    "dist/**/*"
+  ],
   "scripts": {
-    "start": "node src/cli.js",
-    "test": "node --experimental-test-module-mocks --test test/**/*.test.js"
+    "build": "tsc && cp -r src/prompts dist/prompts",
+    "prestart": "npm run build",
+    "start": "node dist/cli.js",
+    "dev": "tsx src/cli.ts",
+    "test": "tsx --experimental-test-module-mocks --test test/**/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/christopherhouse/mule2logic-cli.git"
   },
-  "keywords": [],
+  "keywords": [
+    "mulesoft",
+    "azure",
+    "logic-apps",
+    "migration",
+    "cli",
+    "copilot"
+  ],
   "author": "",
   "license": "ISC",
   "type": "module",
@@ -28,5 +43,10 @@
   "dependencies": {
     "@github/copilot-sdk": "^0.2.1",
     "commander": "^14.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2"
   }
 }

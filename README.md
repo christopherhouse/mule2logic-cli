@@ -5,6 +5,7 @@
 **Migrate MuleSoft flows → Azure Logic Apps Standard workflows with AI ✨**
 
 [![Node.js](https://img.shields.io/badge/Node.js-18%2B-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5%2B-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![GitHub Copilot](https://img.shields.io/badge/Powered%20by-GitHub%20Copilot-8957e5?logo=github)](https://github.com/features/copilot)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/christopherhouse/mule2logic-cli/pulls)
@@ -134,6 +135,23 @@ Content-based routing, message enrichment, splitter/aggregator, idempotent filte
 
 ### Installation
 
+#### Option 1: Run instantly with `npx` (no install needed)
+
+```bash
+npx mule2logic-cli convert flow.xml --pretty
+```
+
+#### Option 2: Install globally from npm
+
+```bash
+npm install -g mule2logic-cli
+
+# Now available everywhere:
+mule2logic convert flow.xml --pretty
+```
+
+#### Option 3: Clone and link for development
+
 ```bash
 # Clone the repo
 git clone https://github.com/christopherhouse/mule2logic-cli.git
@@ -142,8 +160,14 @@ cd mule2logic-cli
 # Install dependencies
 npm install
 
+# Build the TypeScript source
+npm run build
+
 # Link the CLI globally
 npm link
+
+# Now available everywhere:
+mule2logic convert flow.xml
 ```
 
 ---
@@ -264,20 +288,20 @@ mule2logic convert hello-flow.xml --pretty
 
 ```
                     ┌──────────────┐
-XML Input  →  io.js  →  prompt.js  →  copilot.js  →  validate.js  →  review.js  →  report.js  →  Output
+XML Input  →  io.ts  →  prompt.ts  →  copilot.ts  →  validate.ts  →  review.ts  →  report.ts  →  Output
  (file          (read)    (build        (Copilot SDK    (parse &        (QC review    (migration    (JSON +
   or stdin)                prompt)       + MCP servers)   validate)       agent)        report)      report)
 ```
 
 The CLI follows a pipeline with a **multi-pass AI architecture**:
 
-1. **📥 Load** — Read MuleSoft XML from a file or stdin (`io.js`)
-2. **📝 Prompt** — Build structured prompts from markdown templates (`prompt.js` + `prompts/`)
-3. **🤖 Convert** — Send to GitHub Copilot SDK, grounded via Microsoft Learn MCP (Logic Apps schema) and Context7 MCP (MuleSoft docs) (`copilot.js`)
-4. **✅ Validate** — Ensure the response is valid Logic Apps JSON with structural checks (`validate.js`)
-5. **🔍 Review** — A second AI pass validates semantic correctness, checks for dropped elements, and fixes issues (`review.js`)
+1. **📥 Load** — Read MuleSoft XML from a file or stdin (`io.ts`)
+2. **📝 Prompt** — Build structured prompts from markdown templates (`prompt.ts` + `prompts/`)
+3. **🤖 Convert** — Send to GitHub Copilot SDK, grounded via Microsoft Learn MCP (Logic Apps schema) and Context7 MCP (MuleSoft docs) (`copilot.ts`)
+4. **✅ Validate** — Ensure the response is valid Logic Apps JSON with structural checks (`validate.ts`)
+5. **🔍 Review** — A second AI pass validates semantic correctness, checks for dropped elements, and fixes issues (`review.ts`)
 6. **📤 Output** — Write workflow JSON to stdout or a file
-7. **📊 Report** *(optional)* — A third AI pass analyzes the migration and writes a Markdown report to disk (`report.js`)
+7. **📊 Report** *(optional)* — A third AI pass analyzes the migration and writes a Markdown report to disk (`report.ts`)
 
 > If validation fails on step 4, the tool **retries once** automatically.
 
@@ -289,30 +313,32 @@ For a deep dive, check out the [Architecture doc](docs/architecture.md).
 
 ```
 mule2logic-cli/
-├── src/
-│   ├── cli.js                 # CLI entry point (commander)
+├── src/                          # TypeScript source
+│   ├── cli.ts                    # CLI entry point (commander)
 │   ├── commands/
-│   │   └── convert.js         # Conversion pipeline orchestrator
+│   │   └── convert.ts            # Conversion pipeline orchestrator
 │   ├── core/
-│   │   ├── copilot.js         # Copilot SDK + MCP server client
-│   │   ├── prompt.js          # Prompt template loader
-│   │   ├── io.js              # File and stdin reader
-│   │   ├── validate.js        # JSON structure validator
-│   │   ├── review.js          # QC review agent
-│   │   └── report.js          # Migration report generator
+│   │   ├── copilot.ts            # Copilot SDK + MCP server client
+│   │   ├── prompt.ts             # Prompt template loader
+│   │   ├── io.ts                 # File and stdin reader
+│   │   ├── validate.ts           # JSON structure validator
+│   │   ├── review.ts             # QC review agent
+│   │   └── report.ts             # Migration report generator
 │   └── prompts/
-│       ├── system.prompt.md   # System prompt (conversion rules)
-│       ├── user.prompt.md     # User prompt template
-│       ├── review.prompt.md   # Review agent system prompt
-│       ├── report.prompt.md   # Report agent system prompt
-│       └── report.user.prompt.md  # Report user prompt template
+│       ├── system.prompt.md      # System prompt (conversion rules)
+│       ├── user.prompt.md        # User prompt template
+│       ├── review.prompt.md      # Review agent system prompt
+│       ├── report.prompt.md      # Report agent system prompt
+│       └── report.user.prompt.md # Report user prompt template
+├── dist/                         # Compiled JS output (git-ignored)
 ├── test/
-│   ├── *.test.js              # Unit tests (Node.js test runner)
-│   └── fixtures/              # Test XML fixtures
+│   ├── *.test.ts                 # Unit tests (Node.js test runner + tsx)
+│   └── fixtures/                 # Test XML fixtures
 ├── docs/
 │   ├── mule2logic-cli-spec-v2.md
 │   ├── architecture.md
 │   └── test-cases.md
+├── tsconfig.json                 # TypeScript configuration
 ├── package.json
 └── LICENSE
 ```
@@ -321,7 +347,7 @@ mule2logic-cli/
 
 ## 🧪 Testing
 
-Tests use the **Node.js built-in test runner**:
+Tests use the **Node.js built-in test runner** with [tsx](https://github.com/privatenumber/tsx) for TypeScript support:
 
 ```bash
 npm test
@@ -358,6 +384,49 @@ See [test-cases.md](docs/test-cases.md) for full details.
 
 ---
 
+## 📦 Packaging & Distribution
+
+The project is written in **TypeScript** and compiles to JavaScript in the `dist/` directory. The `package.json` is configured for seamless CLI distribution via npm.
+
+### How it works
+
+| `package.json` field | Purpose |
+|---|---|
+| `"bin": { "mule2logic": "dist/cli.js" }` | Registers the `mule2logic` command when installed globally or via npx |
+| `"files": ["dist/**/*"]` | Only the compiled output is included in the published package |
+| `"prepublishOnly": "npm run build"` | Automatically builds before `npm publish` |
+
+### Using via `npx` (zero install)
+
+Anyone with Node.js 18+ can run the CLI without installing anything:
+
+```bash
+npx mule2logic-cli convert my-flow.xml --pretty
+```
+
+> **Note:** The npm package name is `mule2logic-cli`, but the CLI command it registers is `mule2logic`. With `npx` you use the **package name**, but after a global install you use the **command name**.
+
+### Installing globally
+
+```bash
+npm install -g mule2logic-cli
+mule2logic convert my-flow.xml --pretty
+```
+
+### Publishing to npm (for maintainers)
+
+```bash
+# 1. Bump version
+npm version patch   # or minor / major
+
+# 2. Publish (build runs automatically via prepublishOnly)
+npm publish
+```
+
+After publishing, anyone can `npx mule2logic-cli convert ...` or `npm install -g mule2logic-cli` and have the `mule2logic` command available globally.
+
+---
+
 ## 🤝 Contributing
 
 Contributions are welcome! Here's how to get started:
@@ -368,8 +437,9 @@ Contributions are welcome! Here's how to get started:
    git checkout -b feature/my-awesome-feature
    ```
 3. **Make your changes** and add tests
-4. **Run the tests** to make sure everything passes:
+4. **Build and run the tests** to make sure everything passes:
    ```bash
+   npm run build
    npm test
    ```
 5. **Open a Pull Request** 🎉

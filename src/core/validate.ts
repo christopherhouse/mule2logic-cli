@@ -1,4 +1,33 @@
-export function validateJson(output) {
+export interface WorkflowDefinition {
+  definition: {
+    $schema?: string;
+    contentVersion?: string;
+    triggers: Record<string, TriggerAction>;
+    actions: Record<string, WorkflowAction>;
+    parameters?: Record<string, unknown>;
+    staticResults?: Record<string, unknown>;
+  };
+}
+
+export interface TriggerAction {
+  type?: string;
+  kind?: string;
+  inputs?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+export interface WorkflowAction {
+  type?: string;
+  inputs?: unknown;
+  runAfter?: Record<string, string[]>;
+  expression?: unknown;
+  actions?: Record<string, WorkflowAction>;
+  else?: { actions: Record<string, WorkflowAction> };
+  foreach?: string;
+  [key: string]: unknown;
+}
+
+export function validateJson(output: string): WorkflowDefinition {
   if (typeof output !== 'string' || output.trim() === '') {
     throw new Error('Output is empty or not a string');
   }
@@ -20,9 +49,9 @@ export function validateJson(output) {
     }
   }
 
-  let parsed;
+  let parsed: WorkflowDefinition;
   try {
-    parsed = JSON.parse(cleaned);
+    parsed = JSON.parse(cleaned) as WorkflowDefinition;
   } catch {
     throw new Error('Output is not valid JSON');
   }
@@ -42,8 +71,8 @@ export function validateJson(output) {
  * Deep structural validation of a Logic Apps workflow definition.
  * Returns an array of warning/error strings. Empty array means valid.
  */
-export function validateWorkflowStructure(parsed) {
-  const issues = [];
+export function validateWorkflowStructure(parsed: WorkflowDefinition): string[] {
+  const issues: string[] = [];
   const def = parsed.definition;
 
   // Check triggers
