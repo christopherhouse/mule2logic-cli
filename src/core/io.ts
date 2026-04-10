@@ -15,7 +15,7 @@ export async function readInput(filePath?: string): Promise<string> {
     try {
       content = await readFile(filePath, 'utf-8');
     } catch (err: unknown) {
-      if (err instanceof Error && 'code' in err && (err as NodeJS.ErrnoException).code === 'ENOENT') {
+      if (err instanceof Error && (err as NodeJS.ErrnoException).code === 'ENOENT') {
         throw new Error(`File not found: ${filePath}`);
       }
       throw err;
