@@ -150,21 +150,20 @@ export FOUNDRY_MODEL="gpt-4o"  # optional, defaults to gpt-4o
 git clone https://github.com/christopherhouse/mule2logic-cli.git
 cd mule2logic-cli
 
-# Create a virtual environment (recommended)
-python -m venv .venv
-source .venv/bin/activate  # or .venv\Scripts\activate on Windows
+# Install uv if you don't have it (https://docs.astral.sh/uv/)
+# curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Install in editable mode
-pip install -e ".[dev]"
+# Sync dependencies (creates venv automatically)
+uv sync
 
 # Now available:
-mule2logic convert flow.xml --pretty
+uv run mule2logic convert flow.xml --pretty
 ```
 
-#### Option 2: Install directly from pip
+#### Option 2: Install directly via uv
 
 ```bash
-pip install mule2logic
+uv tool install mule2logic
 mule2logic convert flow.xml --pretty
 ```
 
@@ -372,11 +371,11 @@ mule2logic-cli/
 
 ## 🧪 Testing
 
-Tests use **pytest**:
+Tests use **pytest** via **uv**:
 
 ```bash
-pip install -e ".[dev]"
-pytest
+uv sync
+uv run pytest
 ```
 
 Test coverage includes:
@@ -419,8 +418,8 @@ Contributions are welcome! Here's how to get started:
 3. **Make your changes** and add tests
 4. **Run the tests** to make sure everything passes:
    ```bash
-   pip install -e ".[dev]"
-   pytest
+   uv sync
+   uv run pytest
    ```
 5. **Open a Pull Request** 🎉
 
