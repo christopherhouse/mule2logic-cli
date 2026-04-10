@@ -1,0 +1,296 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- AI generated, this could be nonsense -->
+<mule xmlns:ibm-mq="http://www.mulesoft.org/schema/mule/ibm-mq"
+      xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xmlns:azure-service-bus="http://www.mulesoft.org/schema/mule/azure-service-bus"
+      xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+        http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+        http://www.mulesoft.org/schema/mule/ibm-mq http://www.mulesoft.org/schema/mule/ibm-mq/current/mule-ibm-mq.xsd
+        http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+        http://www.mulesoft.org/schema/mule/azure-service-bus http://www.mulesoft.org/schema/mule/azure-service-bus/current/mule-azure-service-bus.xsd">
+
+    <!-- =========================================================
+         CONFIGURATION
+         ========================================================= -->
+
+    <ibm-mq:config name="Ibm_MQ_Config" doc:name="IBM MQ Config">
+        <ibm-mq:connection queueManager="QM1"
+                           channel="DEV.APP.SVRCONN"
+                           hostName="mq.company.internal"
+                           port="1414"
+                           username="mq_app_user"
+                           password="mq_app_password"/>
+    </ibm-mq:config>
+
+    <!-- Pretend SAP is exposed through an API facade -->
+    <http:request-config name="SAP_HTTP_Config" doc:name="SAP HTTP Config">
+        <http:request-connection host="sap-api.company.internal" port="443" protocol="HTTPS"/>
+    </http:request-config>
+
+    <sfdc:config name="Salesforce_Config" doc:name="Salesforce Config">
+        <sfdc:basic-connection username="integration@contoso.com"
+                               password="superSecretPassword"
+                               securityToken="securityTokenValue"/>
+    </sfdc:config>
+
+    <azure-service-bus:config name="Azure_Service_Bus_Config" doc:name="Azure Service Bus Config">
+        <azure-service-bus:shared-access-signature-connection
+                connectionString="Endpoint=sb://contoso-integration.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=REDACTED"/>
+    </azure-service-bus:config>
+
+    <!-- =========================================================
+         MAIN FLOW
+         ========================================================= -->
+
+    <flow name="shipment-confirmation-orchestration-flow">
+
+        <!-- Trigger from IBM MQ -->
+        <ibm-mq:listener config-ref="Ibm_MQ_Config"
+                         destination="IN.SHIPMENT.CONFIRMATION.Q"
+                         doc:name="Listen for Shipment Confirmation"/>
+
+        <!-- Assume MQ payload is JSON text -->
+        <ee:transform doc:name="Parse Inbound Message and Set Working Vars">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+read(payload, "application/json")
+]]></ee:set-payload>
+            </ee:message>
+            <ee:variables>
+                <ee:set-variable variableName="correlationId"><![CDATA[%dw 2.0
+output application/java
+---
+attributes.messageId default payload.messageId default uuid()
+]]></ee:set-variable>
+                <ee:set-variable variableName="receivedAt"><![CDATA[%dw 2.0
+output application/java
+---
+now()
+]]></ee:set-variable>
+            </ee:variables>
+        </ee:transform>
+
+        <logger level="INFO" doc:name="Log Receipt"
+                message='#[ "Received shipment confirmation for shipmentId=" ++ (payload.shipment.shipmentId as String) ++ ", orderNumber=" ++ (payload.order.orderNumber as String) ++ ", correlationId=" ++ vars.correlationId ]'/>
+
+        <!-- Build SAP request -->
+        <ee:transform doc:name="Transform Shipment to SAP Delivery Posting Request">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+fun lbToKg(lb) = ((lb as Number) * 0.453592) round 3
+fun normalizeUom(uom) =
+    upper(uom) match {
+        case "EA" -> "EA"
+        case "EACH" -> "EA"
+        case "CS" -> "CAR"
+        case "CASE" -> "CAR"
+        else -> "EA"
+    }
+---
+{
+  deliveryPostingRequest: {
+    externalReference: payload.shipment.shipmentId,
+    salesOrderNumber: payload.order.orderNumber,
+    deliveryDate: payload.shipment.shipDate,
+    shippingPoint: payload.shipment.warehouse.code,
+    plant: payload.shipment.warehouse.plantCode,
+    soldToParty: payload.customer.erpCustomerNumber,
+    shipToParty: {
+      name: payload.customer.name,
+      addressLine1: payload.customer.address.line1,
+      city: payload.customer.address.city,
+      postalCode: payload.customer.address.postalCode,
+      countryCode: payload.customer.address.country
+    },
+    headerText: "Shipment posted from WMS via MuleSoft",
+    handlingInstructions:
+      if ((payload.shipment.expedited default false) == true)
+        "PRIORITY HANDLING REQUIRED"
+      else
+        "STANDARD FULFILLMENT",
+    totalGrossWeightKg: lbToKg(payload.shipment.totalWeightLb default 0),
+    packageCount: sizeOf(payload.shipment.packages default []),
+    carrier: {
+      code: payload.shipment.carrier.scac,
+      serviceLevel:
+        upper(payload.shipment.carrier.serviceLevel default "GROUND") match {
+          case "NEXT_DAY" -> "EXPRESS"
+          case "2_DAY" -> "EXPRESS"
+          else -> "STANDARD"
+        }
+    },
+    lineItems: (payload.shipment.lines default []) map (line, index) -> {
+      itemNumber: ((index + 1) * 10) as String {format: "000000"},
+      materialNumber: line.sku,
+      batchNumber: line.lot default null,
+      deliveredQuantity: line.quantityShipped,
+      salesUnit: normalizeUom(line.uom),
+      storageLocation:
+        if ((line.temperatureZone default "AMBIENT") == "COLD")
+          "C001"
+        else
+          "A001",
+      valuationType:
+        if ((line.inventoryType default "SELLABLE") == "QC_HOLD")
+          "QH"
+        else
+          "STD",
+      serialNumbers: (line.serialNumbers default []) map (sn) -> {
+        serialNumber: sn
+      }
+    },
+    partnerReferences: [
+      {
+        type: "BOL",
+        value: payload.shipment.billOfLading
+      },
+      {
+        type: "TRACKING",
+        value: payload.shipment.trackingNumber
+      }
+    ] filter ($.value != null)
+  }
+}
+]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+
+        <logger level="DEBUG" doc:name="Log SAP Request"
+                message='#[write(payload, "application/json")]'/>
+
+        <!-- Send to SAP -->
+        <http:request config-ref="SAP_HTTP_Config"
+                      method="POST"
+                      path="/api/deliveries/post"
+                      doc:name="Send Delivery Posting to SAP">
+            <http:headers><![CDATA[#[{
+                "Content-Type": "application/json",
+                "x-correlation-id": vars.correlationId
+            }]]]></http:headers>
+        </http:request>
+
+        <choice doc:name="Check SAP Response">
+            <when expression="#[attributes.statusCode >= 200 and attributes.statusCode < 300]">
+
+                <ee:transform doc:name="Store SAP Success Response">
+                    <ee:variables>
+                        <ee:set-variable variableName="sapResponse"><![CDATA[%dw 2.0
+output application/java
+---
+payload
+]]></ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+
+                <!-- Build Salesforce update -->
+                <ee:transform doc:name="Transform SAP Response to Salesforce Order Update">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/java
+var sap = vars.sapResponse
+---
+{
+  OrderNumber__c: sap.salesOrderNumber default null,
+  SAP_Delivery_Document__c: sap.deliveryDocumentNumber default null,
+  SAP_Material_Document__c: sap.materialDocumentNumber default null,
+  Shipment_Status__c:
+    if ((sap.overallStatus default "") as String == "POSTED")
+      "Fulfilled"
+    else if ((sap.overallStatus default "") as String == "PARTIAL")
+      "Partially Fulfilled"
+    else
+      "ERP Processing",
+  Actual_Ship_Date__c: sap.postingDate default null,
+  Carrier_Tracking_Number__c: sap.trackingNumber default null,
+  Warehouse_Confirmation_Id__c: sap.externalReference default null,
+  ERP_Response_Code__c: sap.responseCode default "UNKNOWN",
+  ERP_Response_Message__c:
+    ((sap.messages default []) map $.message) joinBy "; ",
+  Last_Integrated_At__c: now() as String
+}
+]]></ee:set-payload>
+                    </ee:message>
+                </ee:transform>
+
+                <logger level="DEBUG" doc:name="Log Salesforce Update Payload"
+                        message='#[write(payload, "application/json")]'/>
+
+                <!-- Upsert into Salesforce custom object or order-related object -->
+                <sfdc:upsert config-ref="Salesforce_Config"
+                             type="Order_Integration_Status__c"
+                             externalIdFieldName="OrderNumber__c"
+                             doc:name="Upsert Salesforce Order Integration Status"/>
+
+                <!-- Publish completion event to Azure Service Bus -->
+                <ee:transform doc:name="Build Completion Event">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+var sap = vars.sapResponse
+---
+{
+  eventType: "ShipmentFulfillmentCompleted",
+  eventVersion: "1.0",
+  eventTime: now(),
+  correlationId: vars.correlationId,
+  sourceSystem: "mulesoft",
+  businessDomain: "order-fulfillment",
+  shipment: {
+    shipmentId: sap.externalReference,
+    salesOrderNumber: sap.salesOrderNumber,
+    sapDeliveryDocumentNumber: sap.deliveryDocumentNumber,
+    sapMaterialDocumentNumber: sap.materialDocumentNumber,
+    postingDate: sap.postingDate
+  },
+  customer: {
+    erpCustomerNumber: sap.soldToParty default null
+  },
+  integrationOutcome: {
+    sapStatus: sap.overallStatus default "UNKNOWN",
+    salesforceUpdated: true,
+    completedAt: now()
+  },
+  summaryMessage:
+    "Shipment " ++ (sap.externalReference as String) ++
+    " for sales order " ++ (sap.salesOrderNumber as String) ++
+    " was posted to SAP, synchronized to Salesforce, and completed successfully."
+}
+]]></ee:set-payload>
+                    </ee:message>
+                </ee:transform>
+
+                <azure-service-bus:send config-ref="Azure_Service_Bus_Config"
+                                        destinationName="shipment-fulfillment-topic"
+                                        doc:name="Publish Completion Event to Azure Service Bus"/>
+
+                <logger level="INFO" doc:name="Log Success"
+                        message='#[ "Completed orchestration successfully for correlationId=" ++ vars.correlationId ]'/>
+
+            </when>
+
+            <otherwise>
+                <logger level="ERROR" doc:name="Log SAP Failure"
+                        message='#[ "SAP call failed. correlationId=" ++ vars.correlationId ++ ", statusCode=" ++ (attributes.statusCode as String) ++ ", body=" ++ write(payload, "application/json") ]'/>
+                <raise-error type="SAP:DELIVERY_POST_FAILED" description="SAP delivery posting failed"/>
+            </otherwise>
+        </choice>
+
+        <error-handler>
+            <on-error-propagate logException="true" doc:name="Propagate Error">
+                <logger level="ERROR" doc:name="Log Orchestration Error"
+                        message='#[ "Shipment orchestration failed for correlationId=" ++ (vars.correlationId default "unknown") ++ ". Error: " ++ error.description ]'/>
+            </on-error-propagate>
+        </error-handler>
+
+    </flow>
+
+</mule>

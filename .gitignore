@@ -1,4 +1,14 @@
-# Dependencies
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+.venv/
+venv/
+.eggs/
+
+# Node.js
 node_modules/
 
 # Build output
@@ -26,7 +36,13 @@ Thumbs.db
 
 # Coverage
 coverage/
+.coverage
+htmlcov/
 .nyc_output/
+
+# Testing
+.pytest_cache/
+.mypy_cache/
 
 # Temporary files
 tmp/
