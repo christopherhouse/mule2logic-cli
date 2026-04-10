@@ -21,7 +21,7 @@ import os
 import sys
 from typing import Any
 
-from agent_framework import ChatAgent
+from agent_framework import Agent
 from agent_framework.foundry import FoundryChatClient
 from azure.identity.aio import AzureCliCredential
 
@@ -83,7 +83,7 @@ async def run_agent(
             print(f"[verbose] Agent endpoint: {endpoint}", file=sys.stderr)
             print(f"[verbose] Agent model:    {model}", file=sys.stderr)
 
-        async with ChatAgent(
+        async with Agent(
             client=client,
             name="MuleSoftConverter",
             instructions=system_prompt,
