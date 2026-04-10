@@ -41,7 +41,7 @@ dev = [
 mule2logic = "mule2logic_cli.cli:main"
 
 [tool.setuptools.packages.find]
-where = ["src"]
+where = ["src/python"]
 
 [tool.setuptools.package-data]
 mule2logic_agent = ["prompts/*.md"]

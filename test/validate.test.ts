@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { validateJson, validateWorkflowStructure } from '../src/core/validate.js';
+import { validateJson, validateWorkflowStructure } from '../src/tsx/core/validate.js';
 
 const validJson = JSON.stringify({
   definition: {
