@@ -1,4 +1,4 @@
-"""ANSI colour and spinner helpers for CLI output."""
+"""ANSI color and spinner helpers for CLI output."""
 
 from __future__ import annotations
 
