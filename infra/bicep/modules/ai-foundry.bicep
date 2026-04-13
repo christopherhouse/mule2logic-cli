@@ -28,6 +28,9 @@ param tags object = {}
 @description('Principal ID of the UAMI to grant Cognitive Services OpenAI User role.')
 param uamiPrincipalId string
 
+@description('Resource ID of the UAMI to attach to the AI Services account.')
+param uamiResourceId string
+
 @description('Resource ID of the Log Analytics workspace for diagnostic settings.')
 param logAnalyticsWorkspaceResourceId string
 
@@ -63,6 +66,12 @@ resource aiServicesAccount 'Microsoft.CognitiveServices/accounts@2025-06-01' = {
   kind: 'AIServices'
   sku: {
     name: 'S0'
+  }
+  identity: {
+    type: 'UserAssigned'
+    userAssignedIdentities: {
+      '${uamiResourceId}': {}
+    }
   }
   properties: {
     allowProjectManagement: true
