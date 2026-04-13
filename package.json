@@ -13,10 +13,10 @@
     "dist/**/*"
   ],
   "scripts": {
-    "build": "tsc && cp -r src/tsx/prompts dist/prompts",
+    "build": "tsc && cp -r src/prompts dist/prompts",
     "prestart": "npm run build",
     "start": "node dist/cli.js",
-    "dev": "tsx src/tsx/cli.ts",
+    "dev": "tsx src/cli.ts",
     "test": "tsx --experimental-test-module-mocks --test test/**/*.test.ts",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run build"

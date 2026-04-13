@@ -36,7 +36,7 @@ mock.module('@github/copilot-sdk', {
   }
 });
 
-const { convertCommand } = await import('../src/tsx/commands/convert.js');
+const { convertCommand } = await import('../src/commands/convert.js');
 
 // Capture stdout and stderr
 function captureOutput() {
