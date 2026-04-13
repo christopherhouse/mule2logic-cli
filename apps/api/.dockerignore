@@ -1,0 +1,25 @@
+# Dependency and environment files
+.venv/
+.python-version
+uv.lock
+
+# Tests and dev tooling
+tests/
+.pytest_cache/
+.ruff_cache/
+
+# IDE and OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Docs and non-runtime files
+*.md
+LICENSE
+
+# Build artifacts
+dist/
+*.egg-info/
+__pycache__/

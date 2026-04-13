@@ -1,0 +1,69 @@
+# ---------------------------------------------------------------------------
+# Bicep What-If Workflow
+# ---------------------------------------------------------------------------
+# Shows infrastructure diff on PRs that modify Bicep files.
+# Requires Azure OIDC credentials — runs separately from pr-validation.yml
+# so non-infra PRs don't need Azure auth.
+# ---------------------------------------------------------------------------
+
+name: Bicep What-If
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "infra/bicep/**"
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+jobs:
+  what-if:
+    name: Bicep What-If (${{ matrix.environment }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        environment: [dev]
+    environment: ${{ matrix.environment }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Run What-If
+        id: whatif
+        run: |
+          OUTPUT=$(az deployment group what-if \
+            --resource-group ${{ vars.AZURE_RESOURCE_GROUP_NAME }} \
+            --template-file infra/bicep/main.bicep \
+            --parameters infra/bicep/main.${{ matrix.environment }}.bicepparam \
+            --no-pretty-print 2>&1) || true
+          echo "result<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$OUTPUT" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Comment PR with What-If results
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const output = `### Bicep What-If Results (\`${{ matrix.environment }}\`)
+
+            \`\`\`
+            ${{ steps.whatif.outputs.result }}
+            \`\`\`
+
+            *Triggered by commit ${{ github.sha }}*`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            });
