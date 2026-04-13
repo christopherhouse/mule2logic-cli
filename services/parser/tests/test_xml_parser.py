@@ -102,10 +102,10 @@ class TestParseGlobalConfig:
     """Verify parsing of global-config.xml."""
 
     def test_parse_global_config(self, hello_world_project: Path) -> None:
-        """Expect 2 global elements whose local tag ends with ``-config``.
+        """Expect 3 global elements: HTTP_Listener_config, HTTP_Request_config, Database_Config.
 
-        Note: ``db:config`` has local name ``config`` which does **not** end
-        with ``-config``, so the parser correctly excludes it.
+        ``db:config`` has local name ``config`` which is also detected as a global
+        config element.
         """
         xml_path = hello_world_project / "src" / "main" / "mule" / "global-config.xml"
         _flows, _subflows, global_elements, connector_configs, _ff, warnings = parse_mule_xml(
@@ -113,15 +113,11 @@ class TestParseGlobalConfig:
         )
 
         ge_names = {ge.name for ge in global_elements}
-        assert ge_names == {"HTTP_Listener_config", "HTTP_Request_config"}
-        assert len(global_elements) == 2
+        assert ge_names == {"HTTP_Listener_config", "HTTP_Request_config", "Database_Config"}
+        assert len(global_elements) == 3
 
     def test_connector_config_properties(self, hello_world_project: Path) -> None:
-        """Connector configs (``*-config`` tags) should have referenced_properties extracted.
-
-        ``db:config`` has local name ``config`` (no ``-config`` suffix) and is
-        therefore not classified as a global config element by the parser.
-        """
+        """Connector configs should have referenced_properties extracted."""
         xml_path = hello_world_project / "src" / "main" / "mule" / "global-config.xml"
         _flows, _subflows, _ge, connector_configs, _ff, _warnings = parse_mule_xml(
             xml_path, relative_to=hello_world_project
@@ -136,8 +132,12 @@ class TestParseGlobalConfig:
         assert "api.host" in request.referenced_properties
         assert "api.port" in request.referenced_properties
 
-        # db:config is not detected because its local name is "config" (no "-config" suffix)
-        assert "Database_Config" not in cc_by_name
+        db = cc_by_name["Database_Config"]
+        assert "db.host" in db.referenced_properties
+        assert "db.port" in db.referenced_properties
+        assert "db.user" in db.referenced_properties
+        assert "db.password" in db.referenced_properties
+        assert "db.name" in db.referenced_properties
 
 
 # ---------------------------------------------------------------------------

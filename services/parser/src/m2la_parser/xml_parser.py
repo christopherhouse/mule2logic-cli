@@ -260,7 +260,7 @@ def _is_trigger(local_name: str) -> bool:
 
 def _is_global_config(local_name: str) -> bool:
     """Check if a local element name represents a global config element."""
-    return local_name.endswith(_CONFIG_SUFFIX)
+    return local_name.endswith(_CONFIG_SUFFIX) or local_name == "config"
 
 
 def _local_name(tag: str) -> str:

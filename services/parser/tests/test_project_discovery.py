@@ -40,16 +40,15 @@ class TestDiscoverProjectMode:
         assert sf_names == {"sharedLogic", "errorHandlingLogic"}
         assert len(inventory.subflows) == 2
 
-        # Global elements – only tags ending with "-config" are detected;
-        # db:config has local name "config" so it is excluded.
+        # Global elements – includes db:config (local name "config") in addition to *-config tags
         ge_names = {ge.name for ge in inventory.global_elements}
-        assert ge_names == {"HTTP_Listener_config", "HTTP_Request_config"}
-        assert len(inventory.global_elements) == 2
+        assert ge_names == {"HTTP_Listener_config", "HTTP_Request_config", "Database_Config"}
+        assert len(inventory.global_elements) == 3
 
         # Connector configs – one per detected global element
         cc_names = {cc.name for cc in inventory.connector_configs}
-        assert cc_names == {"HTTP_Listener_config", "HTTP_Request_config"}
-        assert len(inventory.connector_configs) == 2
+        assert cc_names == {"HTTP_Listener_config", "HTTP_Request_config", "Database_Config"}
+        assert len(inventory.connector_configs) == 3
 
         # Property files – 2 files
         pf_paths = [pf.file_path for pf in inventory.property_files]
