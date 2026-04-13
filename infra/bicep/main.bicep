@@ -28,21 +28,11 @@ param containerImage string = ''
 @allowed(['Basic', 'Standard', 'Premium'])
 param acrSkuName string = 'Basic'
 
-@description('OpenAI model deployments for AI Foundry.')
-param aiModelDeployments array = [
-  {
-    name: 'gpt-4o'
-    model: {
-      format: 'OpenAI'
-      name: 'gpt-4o'
-      version: '2024-11-20'
-    }
-    sku: {
-      name: 'GlobalStandard'
-      capacity: 50
-    }
-  }
-]
+@description('SKU name for the GPT-4o model deployment.')
+param aiModelDeploymentSkuName string = 'GlobalStandard'
+
+@description('Capacity (K TPM) for the GPT-4o model deployment.')
+param aiModelDeploymentCapacity int = 30
 
 // ---------------------------------------------------------------------------
 // Computed values
@@ -50,6 +40,7 @@ param aiModelDeployments array = [
 var defaultTags = union(tags, {
   project: 'mule2logic'
   environment: environmentName
+  SecurityControl: 'Ignore'
 })
 
 var uamiName = 'id-m2la-${environmentName}'
@@ -112,18 +103,17 @@ module containerApps 'modules/container-apps.bicep' = {
 }
 
 // ---------------------------------------------------------------------------
-// Module: AI Foundry (hub + project + model deployments)
+// Module: AI Foundry (AI Services account + GPT-4o deployment)
 // ---------------------------------------------------------------------------
 module aiFoundry 'modules/ai-foundry.bicep' = {
   name: 'ai-foundry'
   params: {
-    environmentName: environmentName
+    name: 'ais-m2la-${environmentName}'
     location: location
     tags: defaultTags
-    uamiPrincipalId: identity.outputs.principalId
-    uamiResourceId: identity.outputs.resourceId
-    aiModelDeployments: aiModelDeployments
-    logAnalyticsWorkspaceResourceId: monitoring.outputs.logAnalyticsWorkspaceResourceId
+    modelDeploymentSkuName: aiModelDeploymentSkuName
+    modelDeploymentCapacity: aiModelDeploymentCapacity
+    logAnalyticsWorkspaceId: monitoring.outputs.logAnalyticsWorkspaceResourceId
   }
 }
 
@@ -163,11 +153,11 @@ output apiAppName string = containerApps.outputs.appName
 output containerAppsEnvironmentName string = containerApps.outputs.environmentName
 
 // AI Foundry
-@description('AI Foundry project name.')
-output aiProjectName string = aiFoundry.outputs.projectName
-
 @description('AI Services account name.')
 output aiServicesName string = aiFoundry.outputs.aiServicesName
 
 @description('AI Services endpoint.')
-output aiServicesEndpoint string = aiFoundry.outputs.aiServicesEndpoint
+output aiServicesEndpoint string = aiFoundry.outputs.endpoint
+
+@description('AI Services system-assigned identity principal ID.')
+output aiServicesPrincipalId string = aiFoundry.outputs.principalId
