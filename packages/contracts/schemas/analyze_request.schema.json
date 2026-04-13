@@ -1,0 +1,90 @@
+{
+  "$defs": {
+    "InputMode": {
+      "description": "Discriminator for project vs single-flow input mode.",
+      "enum": [
+        "project",
+        "single_flow"
+      ],
+      "title": "InputMode",
+      "type": "string"
+    },
+    "TelemetryContext": {
+      "description": "Telemetry correlation metadata propagated across CLI, API, and services.",
+      "properties": {
+        "trace_id": {
+          "description": "OpenTelemetry trace ID",
+          "title": "Trace Id",
+          "type": "string"
+        },
+        "span_id": {
+          "description": "OpenTelemetry span ID",
+          "title": "Span Id",
+          "type": "string"
+        },
+        "correlation_id": {
+          "description": "Platform correlation ID (UUID)",
+          "title": "Correlation Id",
+          "type": "string"
+        },
+        "parent_span_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Parent span ID for nested operations",
+          "title": "Parent Span Id"
+        }
+      },
+      "required": [
+        "trace_id",
+        "span_id",
+        "correlation_id"
+      ],
+      "title": "TelemetryContext",
+      "type": "object"
+    }
+  },
+  "description": "Request to analyze a MuleSoft project or single flow.",
+  "properties": {
+    "input_path": {
+      "description": "Path to MuleSoft project root directory or single flow XML file",
+      "title": "Input Path",
+      "type": "string"
+    },
+    "mode": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/InputMode"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Input mode; auto-detected from path if not specified"
+    },
+    "telemetry": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/TelemetryContext"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Telemetry context for trace propagation"
+    }
+  },
+  "required": [
+    "input_path"
+  ],
+  "title": "AnalyzeRequest",
+  "type": "object"
+}

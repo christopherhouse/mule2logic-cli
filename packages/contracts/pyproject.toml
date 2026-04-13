@@ -1,23 +1,16 @@
 [project]
-name = "m2la-api"
+name = "m2la-contracts"
 version = "0.1.0"
-description = "MuleSoft to Logic Apps Standard Migration API"
+description = "Shared contracts and schemas for MuleSoft to Logic Apps migration platform"
 requires-python = ">=3.13"
 dependencies = [
-    "fastapi",
-    "uvicorn[standard]",
-    "m2la-contracts",
+    "pydantic>=2.0",
 ]
-
-[tool.uv.sources]
-m2la-contracts = { path = "../../packages/contracts", editable = true }
 
 [dependency-groups]
 dev = [
     "ruff",
     "pytest",
-    "pytest-asyncio",
-    "httpx",
 ]
 
 [build-system]
@@ -25,15 +18,18 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project.scripts]
-m2la-api = "m2la_api.main:main"
+generate-schemas = "m2la_contracts.scripts.generate_schemas:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/m2la_contracts"]
 
 [tool.ruff]
 target-version = "py313"
 line-length = 120
+src = ["src"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W", "UP"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-asyncio_mode = "auto"

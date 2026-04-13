@@ -1,0 +1,67 @@
+{
+  "mode": "single_flow",
+  "project_name": null,
+  "flows": [
+    {
+      "flow_name": "order-process-flow",
+      "source_file": "order-process.xml",
+      "constructs": {
+        "supported": 3,
+        "unsupported": 0,
+        "partial": 1,
+        "details": {
+          "http_listener": 1,
+          "set_payload": 1,
+          "logger": 1,
+          "dataweave": 1
+        }
+      },
+      "gaps": [],
+      "warnings": [
+        {
+          "code": "PARTIAL_DATAWEAVE",
+          "message": "DataWeave transformation may require manual review",
+          "severity": "warning",
+          "source_location": "order-process.xml:25"
+        }
+      ]
+    }
+  ],
+  "overall_constructs": {
+    "supported": 3,
+    "unsupported": 0,
+    "partial": 1,
+    "details": {
+      "http_listener": 1,
+      "set_payload": 1,
+      "logger": 1,
+      "dataweave": 1
+    }
+  },
+  "gaps": [],
+  "warnings": [
+    {
+      "code": "PARTIAL_DATAWEAVE",
+      "message": "DataWeave transformation may require manual review",
+      "severity": "warning",
+      "source_location": "order-process.xml:25"
+    },
+    {
+      "code": "MISSING_CONNECTOR_CONFIG",
+      "message": "Connector configurations are unavailable in single-flow mode; external connector references cannot be resolved",
+      "severity": "warning",
+      "source_location": null
+    },
+    {
+      "code": "MISSING_PROPERTY_FILES",
+      "message": "Property files are unavailable in single-flow mode; property placeholders cannot be resolved",
+      "severity": "warning",
+      "source_location": null
+    }
+  ],
+  "telemetry": {
+    "trace_id": "def789ghi012",
+    "span_id": "span004",
+    "correlation_id": "550e8400-e29b-41d4-a716-446655440001"
+  }
+}

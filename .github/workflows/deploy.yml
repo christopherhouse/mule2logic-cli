@@ -102,7 +102,7 @@ jobs:
             --image m2la-api:${{ steps.meta.outputs.tag }} \
             --image m2la-api:latest \
             --file apps/api/Dockerfile \
-            apps/api/
+            .
 
   # -----------------------------------------------------------------------
   # Job 3: Deploy to Container Apps

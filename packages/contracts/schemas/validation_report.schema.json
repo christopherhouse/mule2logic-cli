@@ -1,0 +1,140 @@
+{
+  "$defs": {
+    "Severity": {
+      "description": "Severity levels for warnings, gaps, and validation issues.",
+      "enum": [
+        "info",
+        "warning",
+        "error",
+        "critical"
+      ],
+      "title": "Severity",
+      "type": "string"
+    },
+    "TelemetryContext": {
+      "description": "Telemetry correlation metadata propagated across CLI, API, and services.",
+      "properties": {
+        "trace_id": {
+          "description": "OpenTelemetry trace ID",
+          "title": "Trace Id",
+          "type": "string"
+        },
+        "span_id": {
+          "description": "OpenTelemetry span ID",
+          "title": "Span Id",
+          "type": "string"
+        },
+        "correlation_id": {
+          "description": "Platform correlation ID (UUID)",
+          "title": "Correlation Id",
+          "type": "string"
+        },
+        "parent_span_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Parent span ID for nested operations",
+          "title": "Parent Span Id"
+        }
+      },
+      "required": [
+        "trace_id",
+        "span_id",
+        "correlation_id"
+      ],
+      "title": "TelemetryContext",
+      "type": "object"
+    },
+    "ValidationIssue": {
+      "description": "A single validation issue found in the generated artifacts.",
+      "properties": {
+        "rule_id": {
+          "description": "Machine-readable rule identifier (e.g., 'SCHEMA_001')",
+          "title": "Rule Id",
+          "type": "string"
+        },
+        "message": {
+          "description": "Human-readable description of the issue",
+          "title": "Message",
+          "type": "string"
+        },
+        "severity": {
+          "$ref": "#/$defs/Severity",
+          "description": "Issue severity"
+        },
+        "artifact_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Path to the artifact containing the issue",
+          "title": "Artifact Path"
+        },
+        "location": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Location within the artifact (e.g., line number or JSON path)",
+          "title": "Location"
+        }
+      },
+      "required": [
+        "rule_id",
+        "message",
+        "severity"
+      ],
+      "title": "ValidationIssue",
+      "type": "object"
+    }
+  },
+  "description": "Report from validating generated Logic Apps artifacts.",
+  "properties": {
+    "valid": {
+      "description": "Whether all artifacts passed validation",
+      "title": "Valid",
+      "type": "boolean"
+    },
+    "issues": {
+      "description": "List of validation issues found",
+      "items": {
+        "$ref": "#/$defs/ValidationIssue"
+      },
+      "title": "Issues",
+      "type": "array"
+    },
+    "artifacts_validated": {
+      "default": 0,
+      "description": "Number of artifacts that were validated",
+      "minimum": 0,
+      "title": "Artifacts Validated",
+      "type": "integer"
+    },
+    "telemetry": {
+      "$ref": "#/$defs/TelemetryContext",
+      "description": "Telemetry context for trace correlation"
+    }
+  },
+  "required": [
+    "valid",
+    "telemetry"
+  ],
+  "title": "ValidationReport",
+  "type": "object"
+}

@@ -1,0 +1,74 @@
+{
+  "$defs": {
+    "ArtifactEntry": {
+      "description": "A single output artifact in the generated Logic Apps project.",
+      "properties": {
+        "path": {
+          "description": "Relative path of the artifact in the output directory",
+          "title": "Path",
+          "type": "string"
+        },
+        "artifact_type": {
+          "description": "Type of artifact (e.g., 'workflow', 'host_json', 'connections_json', 'parameters_json')",
+          "title": "Artifact Type",
+          "type": "string"
+        },
+        "size_bytes": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "File size in bytes, if known",
+          "title": "Size Bytes"
+        }
+      },
+      "required": [
+        "path",
+        "artifact_type"
+      ],
+      "title": "ArtifactEntry",
+      "type": "object"
+    },
+    "InputMode": {
+      "description": "Discriminator for project vs single-flow input mode.",
+      "enum": [
+        "project",
+        "single_flow"
+      ],
+      "title": "InputMode",
+      "type": "string"
+    }
+  },
+  "description": "Manifest of all generated output artifacts.",
+  "properties": {
+    "artifacts": {
+      "description": "List of generated artifacts",
+      "items": {
+        "$ref": "#/$defs/ArtifactEntry"
+      },
+      "title": "Artifacts",
+      "type": "array"
+    },
+    "output_directory": {
+      "description": "Root output directory path",
+      "title": "Output Directory",
+      "type": "string"
+    },
+    "mode": {
+      "$ref": "#/$defs/InputMode",
+      "description": "Input mode that produced these artifacts"
+    }
+  },
+  "required": [
+    "output_directory",
+    "mode"
+  ],
+  "title": "ArtifactManifest",
+  "type": "object"
+}

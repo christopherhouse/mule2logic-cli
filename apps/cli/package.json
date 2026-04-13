@@ -25,6 +25,7 @@
   ],
   "license": "MIT",
   "dependencies": {
+    "@m2la/contracts": "file:../../packages/contracts/typescript",
     "chalk": "^5.6.2"
   },
   "devDependencies": {

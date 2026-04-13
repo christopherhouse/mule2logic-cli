@@ -161,6 +161,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
+    { name = "m2la-contracts" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -175,6 +176,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi" },
+    { name = "m2la-contracts", editable = "../../packages/contracts" },
     { name = "uvicorn", extras = ["standard"] },
 ]
 
@@ -183,6 +185,23 @@ dev = [
     { name = "httpx" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
+    { name = "ruff" },
+]
+
+[[package]]
+name = "m2la-contracts"
+version = "0.1.0"
+source = { editable = "../../packages/contracts" }
+dependencies = [
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "pydantic", specifier = ">=2.0" }]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest" },
     { name = "ruff" },
 ]
 

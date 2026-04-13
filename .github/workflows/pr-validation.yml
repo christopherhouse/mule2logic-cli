@@ -16,6 +16,9 @@ concurrency:
   group: pr-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   # -----------------------------------------------------------------------
   # Python: lint + test
@@ -42,6 +45,61 @@ jobs:
 
       - name: Test (pytest)
         run: uv run pytest
+
+  # -----------------------------------------------------------------------
+  # Contracts (Python): lint + test
+  # -----------------------------------------------------------------------
+  contracts-python-checks:
+    name: Contracts Python Checks
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/contracts
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python + uv
+        uses: ./.github/actions/setup-python-uv
+        with:
+          working-directory: packages/contracts
+
+      - name: Lint (ruff check)
+        run: uv run ruff check src/ tests/
+
+      - name: Format check (ruff format)
+        run: uv run ruff format --check src/ tests/
+
+      - name: Test (pytest)
+        run: uv run pytest
+
+  # -----------------------------------------------------------------------
+  # Contracts (TypeScript): type-check + test + build
+  # -----------------------------------------------------------------------
+  contracts-typescript-checks:
+    name: Contracts TypeScript Checks
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/contracts/typescript
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check
+        run: npx tsc --noEmit
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
 
   # -----------------------------------------------------------------------
   # TypeScript: lint + format + test + build
@@ -99,4 +157,4 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build API image
-        run: docker build -f apps/api/Dockerfile apps/api/ --tag m2la-api:pr-check
+        run: docker build -f apps/api/Dockerfile . --tag m2la-api:pr-check

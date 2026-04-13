@@ -1,0 +1,32 @@
+{
+  "mode": "single_flow",
+  "project_name": null,
+  "artifacts": {
+    "artifacts": [
+      {
+        "path": "order-process-flow/workflow.json",
+        "artifact_type": "workflow",
+        "size_bytes": 2048
+      }
+    ],
+    "output_directory": "./output",
+    "mode": "single_flow"
+  },
+  "gaps": [],
+  "warnings": [],
+  "constructs": {
+    "supported": 3,
+    "unsupported": 0,
+    "partial": 0,
+    "details": {
+      "http_listener": 1,
+      "set_payload": 1,
+      "logger": 1
+    }
+  },
+  "telemetry": {
+    "trace_id": "def789ghi012",
+    "span_id": "span007",
+    "correlation_id": "550e8400-e29b-41d4-a716-446655440001"
+  }
+}
