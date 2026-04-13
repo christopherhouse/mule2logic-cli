@@ -19,7 +19,7 @@ param tags object = {}
 @description('Resource ID of the Log Analytics workspace for Container Apps Environment.')
 param logAnalyticsWorkspaceResourceId string
 
-@description('Application Insights connection string for the Container Apps Environment.')
+@description('Application Insights connection string for environment-level telemetry.')
 param appInsightsConnectionString string
 
 // ---------------------------------------------------------------------------

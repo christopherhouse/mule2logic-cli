@@ -131,7 +131,7 @@ print_summary() {
   echo -e "  ${ICON_LOCK}  ${BOLD}Identity${RESET}      UAMI (${UAMI_CLIENT_ID})"
   echo -e "  ${ICON_CHART}  ${BOLD}Resources${RESET}     ${CPU} vCPU / ${MEMORY}"
   echo -e "  ${ICON_CHART}  ${BOLD}Scale${RESET}         ${MIN_REPLICAS}–${MAX_REPLICAS} replicas"
-  echo -e "  ${MAGENTA}${BOLD}     Region${RESET}       ${RESOURCE_GROUP}"
+  echo -e "  ${MAGENTA}${BOLD}     RG${RESET}           ${RESOURCE_GROUP}"
   echo ""
 }
 
