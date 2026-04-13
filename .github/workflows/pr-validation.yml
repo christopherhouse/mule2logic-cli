@@ -1,0 +1,144 @@
+# ---------------------------------------------------------------------------
+# PR Validation Workflow
+#
+# Runs on every pull request to validate code quality and infrastructure.
+# Steps: lint, test, build for Python + TypeScript, Bicep validate.
+# ---------------------------------------------------------------------------
+name: PR Validation
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: pr-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  id-token: write  # Required for OIDC Azure login (Bicep validation)
+
+jobs:
+  # ===========================================================================
+  # Python Backend — Lint, Test, Build
+  # ===========================================================================
+  python:
+    name: "Python: lint + test + build"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: uv sync --all-groups
+
+      - name: Lint (ruff check)
+        run: uv run ruff check src/ tests/
+
+      - name: Format check (ruff format)
+        run: uv run ruff format --check src/ tests/
+
+      - name: Test (pytest)
+        run: uv run pytest -v
+
+      - name: Build check
+        run: uv build
+
+  # ===========================================================================
+  # TypeScript CLI — Lint, Test, Build
+  # ===========================================================================
+  typescript:
+    name: "TypeScript: lint + test + build"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/cli
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: apps/cli/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Lint (ESLint)
+        run: npm run lint
+
+      - name: Format check (Prettier)
+        run: npm run format
+
+      - name: Test (vitest)
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+  # ===========================================================================
+  # Bicep — Lint and Validate
+  # ===========================================================================
+  bicep:
+    name: "Bicep: lint + validate"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Lint Bicep templates
+        uses: azure/CLI@v2
+        with:
+          inlineScript: |
+            az bicep build --file infra/bicep/main.bicep --stdout > /dev/null
+
+      # Bicep what-if requires Azure credentials — only run if OIDC is configured.
+      # The Azure login + validate steps are skipped when secrets are not available
+      # (e.g., on forks or before OIDC setup is complete).
+      - name: Azure Login (OIDC)
+        if: vars.AZURE_CLIENT_ID != ''
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Validate Bicep deployment
+        if: vars.AZURE_CLIENT_ID != ''
+        uses: azure/CLI@v2
+        with:
+          inlineScript: |
+            az deployment group validate \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP_NAME }}" \
+              --template-file infra/bicep/main.bicep \
+              --parameters infra/bicep/parameters/dev.bicepparam
+
+      - name: What-If analysis
+        if: vars.AZURE_CLIENT_ID != ''
+        uses: azure/CLI@v2
+        with:
+          inlineScript: |
+            az deployment group what-if \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP_NAME }}" \
+              --template-file infra/bicep/main.bicep \
+              --parameters infra/bicep/parameters/dev.bicepparam
