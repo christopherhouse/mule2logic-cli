@@ -1,5 +1,0 @@
-<!-- AI generated, this could be nonsense -->
-<flow name="test">
-  <http:listener path="/hello"/>
-  <set-payload value="Hello"/>
-</flow>
