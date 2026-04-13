@@ -189,6 +189,25 @@ update_app() {
   step "${ICON_PACKAGE} Updating Container App"
   info "Updating ${BOLD}${APP_NAME}${RESET} → ${DIM}${FULL_IMAGE}${RESET}"
 
+  # Ensure UAMI is assigned (idempotent — no-op if already attached)
+  az containerapp identity assign \
+    --name "${APP_NAME}" \
+    --resource-group "${RESOURCE_GROUP}" \
+    --user-assigned "${UAMI_RESOURCE_ID}" \
+    --output none
+
+  success "User-assigned managed identity verified"
+
+  # Ensure registry uses UAMI for image pull
+  az containerapp registry set \
+    --name "${APP_NAME}" \
+    --resource-group "${RESOURCE_GROUP}" \
+    --server "${ACR_LOGIN_SERVER}" \
+    --identity "${UAMI_RESOURCE_ID}" \
+    --output none
+
+  success "Registry identity verified"
+
   az containerapp update \
     --name "${APP_NAME}" \
     --resource-group "${RESOURCE_GROUP}" \
