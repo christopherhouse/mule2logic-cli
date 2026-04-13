@@ -98,6 +98,7 @@ Use specialized agents for focused work:
 | `typescript-cli` | CLI UX, chalk, emoji, command structure |
 | `foundry-agent` | Agent Framework, Foundry, model deployment |
 | `qa` | Test strategy, golden tests, coverage, fixtures |
+| `tech-writer` | README updates, architecture docs, developer guides |
 
 Use skills for domain knowledge:
 
