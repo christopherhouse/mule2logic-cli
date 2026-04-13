@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.42.1.51946",
-      "templateHash": "2437674020470012031"
+      "templateHash": "7390525992006562722"
     }
   },
   "parameters": {
@@ -9252,7 +9252,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.42.1.51946",
-              "templateHash": "7237959671981273476"
+              "templateHash": "11765135406250885767"
             }
           },
           "parameters": {
@@ -9349,6 +9349,12 @@
               "name": "[format('{0}/{1}', variables('aiServicesName'), variables('projectName'))]",
               "location": "[parameters('location')]",
               "tags": "[parameters('tags')]",
+              "identity": {
+                "type": "UserAssigned",
+                "userAssignedIdentities": {
+                  "[format('{0}', parameters('uamiResourceId'))]": {}
+                }
+              },
               "properties": {
                 "displayName": "[format('MuleSoft to Logic Apps - {0}', parameters('environmentName'))]",
                 "description": "AI Foundry project for the MuleSoft to Logic Apps migration platform."
