@@ -1,5 +1,7 @@
 """MuleSoft to Logic Apps Standard Migration API entrypoint."""
 
+import os
+
 import uvicorn
 from fastapi import FastAPI
 
@@ -18,7 +20,9 @@ async def health() -> dict[str, str]:
 
 def main() -> None:
     """Run the API server."""
-    uvicorn.run("m2la_api.main:app", host="0.0.0.0", port=8000, reload=True)
+    host = os.getenv("M2LA_HOST", "127.0.0.1")
+    port = int(os.getenv("M2LA_PORT", "8000"))
+    uvicorn.run("m2la_api.main:app", host=host, port=port, reload=True)
 
 
 if __name__ == "__main__":
