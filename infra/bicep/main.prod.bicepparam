@@ -5,7 +5,6 @@ using 'main.bicep'
 
 param environmentName = 'prod'
 param acrSkuName = 'Standard'
-param containerImage = ''
 param tags = {
   project: 'mule2logic'
   environment: 'prod'

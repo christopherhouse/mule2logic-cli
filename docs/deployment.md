@@ -24,7 +24,7 @@ All infrastructure is defined in `infra/bicep/` using [Azure Verified Modules (A
 | Application Insights | `avm.res.insights.component` | APM and telemetry |
 | Azure Container Registry | `avm.res.container-registry.registry` | Container image storage |
 | Container Apps Environment | `avm.res.app.managed-environment` | Hosting environment |
-| Container App (API) | `avm.res.app.container-app` | Backend API service |
+| Container App (API) | Script (`infra/scripts/deploy-container-app.sh`) | Backend API service |
 | AI Foundry (hub + project) | `avm.ptn.ai-ml.ai-foundry` | LLM model access for agents |
 
 ### RBAC Role Assignments (UAMI)
@@ -81,23 +81,31 @@ az acr build \
   apps/api/
 ```
 
-### 4. Update Container App
+### 4. Deploy Container App
+
+Use the deployment script after building and pushing the image:
 
 ```bash
-APP_NAME=$(az deployment group show \
-  --resource-group rg-m2la-dev \
-  --name m2la-dev-manual \
-  --query properties.outputs.apiAppName.value -o tsv)
+DEPLOY_NAME="m2la-dev-manual"
+RG="rg-m2la-dev"
 
-ACR_SERVER=$(az deployment group show \
-  --resource-group rg-m2la-dev \
-  --name m2la-dev-manual \
+export RESOURCE_GROUP="$RG"
+export ENVIRONMENT_NAME="dev"
+export ACR_LOGIN_SERVER=$(az deployment group show \
+  --resource-group $RG --name $DEPLOY_NAME \
   --query properties.outputs.acrLoginServer.value -o tsv)
+export IMAGE_TAG="latest"
+export UAMI_RESOURCE_ID=$(az deployment group show \
+  --resource-group $RG --name $DEPLOY_NAME \
+  --query properties.outputs.uamiResourceId.value -o tsv)
+export UAMI_CLIENT_ID=$(az deployment group show \
+  --resource-group $RG --name $DEPLOY_NAME \
+  --query properties.outputs.uamiClientId.value -o tsv)
+export APP_INSIGHTS_CONN_STRING=$(az deployment group show \
+  --resource-group $RG --name $DEPLOY_NAME \
+  --query properties.outputs.appInsightsConnectionString.value -o tsv)
 
-az containerapp update \
-  --name $APP_NAME \
-  --resource-group rg-m2la-dev \
-  --image ${ACR_SERVER}/m2la-api:latest
+./infra/scripts/deploy-container-app.sh
 ```
 
 ---

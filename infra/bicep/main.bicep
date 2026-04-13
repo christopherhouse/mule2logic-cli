@@ -21,9 +21,6 @@ param location string = resourceGroup().location
 @description('Resource tags applied to all resources.')
 param tags object = {}
 
-@description('Full container image reference. Leave empty to use placeholder.')
-param containerImage string = ''
-
 @description('ACR SKU. Use Basic for dev, Standard/Premium for prod.')
 @allowed(['Basic', 'Standard', 'Premium'])
 param acrSkuName string = 'Basic'
@@ -85,7 +82,7 @@ module registry 'modules/registry.bicep' = {
 }
 
 // ---------------------------------------------------------------------------
-// Module: Container Apps (Environment + API App)
+// Module: Container Apps (Environment only — app deployed via script)
 // ---------------------------------------------------------------------------
 module containerApps 'modules/container-apps.bicep' = {
   name: 'container-apps'
@@ -93,10 +90,6 @@ module containerApps 'modules/container-apps.bicep' = {
     environmentName: environmentName
     location: location
     tags: defaultTags
-    uamiResourceId: identity.outputs.resourceId
-    uamiClientId: identity.outputs.clientId
-    acrLoginServer: registry.outputs.loginServer
-    containerImage: containerImage
     logAnalyticsWorkspaceResourceId: monitoring.outputs.logAnalyticsWorkspaceResourceId
     appInsightsConnectionString: monitoring.outputs.appInsightsConnectionString
   }
@@ -128,6 +121,9 @@ output uamiPrincipalId string = identity.outputs.principalId
 @description('UAMI client ID.')
 output uamiClientId string = identity.outputs.clientId
 
+@description('UAMI resource ID.')
+output uamiResourceId string = identity.outputs.resourceId
+
 // Monitoring
 @description('Application Insights connection string.')
 output appInsightsConnectionString string = monitoring.outputs.appInsightsConnectionString
@@ -142,13 +138,7 @@ output acrLoginServer string = registry.outputs.loginServer
 @description('ACR name.')
 output acrName string = registry.outputs.name
 
-// Container Apps
-@description('API Container App FQDN.')
-output apiAppFqdn string = containerApps.outputs.fqdn
-
-@description('API Container App name.')
-output apiAppName string = containerApps.outputs.appName
-
+// Container Apps Environment
 @description('Container Apps Environment name.')
 output containerAppsEnvironmentName string = containerApps.outputs.environmentName
 
