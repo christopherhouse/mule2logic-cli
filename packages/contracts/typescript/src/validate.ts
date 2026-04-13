@@ -1,9 +1,17 @@
 /**
- * Validation report contracts.
+ * Validation request/report contracts.
  */
 
 import type { Severity } from "./enums.js";
 import type { TelemetryContext } from "./telemetry.js";
+
+/** Request to validate generated Logic Apps artifacts. */
+export interface ValidateRequest {
+  /** Path to the output directory containing generated artifacts. */
+  output_directory: string;
+  /** Telemetry context for trace propagation. */
+  telemetry?: TelemetryContext | null;
+}
 
 /** A single validation issue found in the generated artifacts. */
 export interface ValidationIssue {

@@ -1,9 +1,16 @@
-"""Validation report contracts."""
+"""Validation request/report contracts."""
 
 from pydantic import BaseModel, Field
 
 from m2la_contracts.enums import Severity
 from m2la_contracts.telemetry import TelemetryContext
+
+
+class ValidateRequest(BaseModel):
+    """Request to validate generated Logic Apps artifacts."""
+
+    output_directory: str = Field(..., description="Path to the output directory containing generated artifacts")
+    telemetry: TelemetryContext | None = Field(default=None, description="Telemetry context for trace propagation")
 
 
 class ValidationIssue(BaseModel):

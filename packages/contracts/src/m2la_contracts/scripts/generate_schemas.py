@@ -6,7 +6,7 @@ from pathlib import Path
 from m2la_contracts.analyze import AnalyzeRequest, AnalyzeResponse
 from m2la_contracts.common import ArtifactManifest
 from m2la_contracts.transform import TransformRequest, TransformResponse
-from m2la_contracts.validate import ValidationReport
+from m2la_contracts.validate import ValidateRequest, ValidationReport
 
 # Map of output filename to model class
 SCHEMA_MODELS: dict[str, type] = {
@@ -14,6 +14,7 @@ SCHEMA_MODELS: dict[str, type] = {
     "analyze_response.schema.json": AnalyzeResponse,
     "transform_request.schema.json": TransformRequest,
     "transform_response.schema.json": TransformResponse,
+    "validate_request.schema.json": ValidateRequest,
     "validation_report.schema.json": ValidationReport,
     "artifact_manifest.schema.json": ArtifactManifest,
 }

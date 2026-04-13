@@ -21,4 +21,4 @@ export type { AnalyzeRequest, FlowAnalysis, AnalyzeResponse } from "./analyze.js
 export type { TransformRequest, TransformResponse } from "./transform.js";
 
 // Validate
-export type { ValidationIssue, ValidationReport } from "./validate.js";
+export type { ValidateRequest, ValidationIssue, ValidationReport } from "./validate.js";

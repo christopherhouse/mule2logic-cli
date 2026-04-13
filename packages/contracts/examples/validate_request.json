@@ -1,0 +1,8 @@
+{
+  "output_directory": "/home/user/output/logicapp",
+  "telemetry": {
+    "trace_id": "abc123def456",
+    "span_id": "span007",
+    "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
+  }
+}
