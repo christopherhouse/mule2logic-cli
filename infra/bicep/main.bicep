@@ -121,6 +121,7 @@ module aiFoundry 'modules/ai-foundry.bicep' = {
     location: location
     tags: defaultTags
     uamiPrincipalId: identity.outputs.principalId
+    uamiResourceId: identity.outputs.resourceId
     aiModelDeployments: aiModelDeployments
     logAnalyticsWorkspaceResourceId: monitoring.outputs.logAnalyticsWorkspaceResourceId
   }
