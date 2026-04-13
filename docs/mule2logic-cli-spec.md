@@ -7,8 +7,8 @@ This product converts MuleSoft (Anypoint) projects into Azure Logic Apps Standar
 - Backend: Python 3.13
 - Python toolchain: **uv** exclusively (no pip, pip-tools, poetry, or conda). Use uv for venv creation, dependency resolution, locking, and installation.
 - Frontend/CLI UX: TypeScript (latest GA) with rich terminal UI (chalk, emojis, icons)
-- Input: Full MuleSoft project (pom.xml + flows)
-- Output: Full Logic Apps Standard project structure (connections.json, host.json, parameters.json, .env)
+- Input: Full MuleSoft project (pom.xml + flows) **or** a single Mule flow XML file
+- Output: Full Logic Apps Standard project structure (connections.json, host.json, parameters.json, .env) **or** standalone workflow JSON (single-flow mode)
 - Hosting: Azure Container Apps (default)
 - Identity: User Assigned Managed Identity ONLY
 - Observability: OpenTelemetry + Azure Monitor + App Insights (end-to-end)
@@ -32,12 +32,23 @@ This product converts MuleSoft (Anypoint) projects into Azure Logic Apps Standar
 
 ## 4. Input Contract
 
-CLI accepts:
-- Path to MuleSoft project root
+The platform supports two input modes. Both are **hard requirements** for MVP.
+
+### Project Mode (default)
+CLI accepts a path to a MuleSoft project root.
 - Must contain:
   - pom.xml
   - src/main/mule/*.xml
   - configs
+
+### Single-Flow Mode
+CLI accepts a path to an individual Mule flow XML file.
+- The file must be a valid Mule XML containing at least one `<flow>` or `<sub-flow>` element.
+- No pom.xml or project structure required.
+- Connector configs and property references outside the file are unavailable — the platform must emit warnings for unresolvable references rather than failing.
+- Output is a standalone workflow JSON (no host.json, connections.json, etc.).
+
+The CLI and API must auto-detect the mode from the input path (directory → project mode, `.xml` file → single-flow mode), or accept an explicit flag/parameter to override.
 
 ---
 
@@ -161,10 +172,11 @@ Features:
 - Emojis/icons
 - Progress bars
 - Sections:
-  🔍 Analyzing project
+  🔍 Analyzing project / flow
   🧠 Planning migration
   ⚙️ Converting flows
   ✅ Validating output
+- Single-flow mode must clearly indicate it is operating on a single file, warn about missing external context (connector configs, properties), and output only workflow JSON.
 
 ---
 
@@ -186,7 +198,9 @@ V2:
 
 ## 15. Acceptance Criteria
 
-- Valid Logic Apps project output
+- Valid Logic Apps project output (project mode)
+- Valid standalone workflow JSON output (single-flow mode)
+- Both modes are functional and tested in MVP
 - Deployable to Azure
 - No secrets used
 - Observability enabled
