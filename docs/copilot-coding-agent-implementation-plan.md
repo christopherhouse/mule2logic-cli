@@ -647,7 +647,9 @@ Do not make the CLI depend on transformation logic yet beyond calling placeholde
 
 ---
 
-## PR-006 — Mule Project Discovery and Parsing
+## PR-006 — Mule Project Discovery and Parsing ✅ COMPLETE
+
+> **Completed**: 2026-04-13. Delivered as planned. Used `defusedxml` for safe XML parsing (addresses XML bomb/entity expansion attacks). `db:config` (bare `config` local name) is detected as a global config element. 35 tests covering both project and single-flow modes. No deviations from scope. Follow-up: IR generation (PR-007) will consume `ProjectInventory` from this parser.
 
 ### Goal
 Parse a valid Mule project **or** a single Mule flow XML file.
