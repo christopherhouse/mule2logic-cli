@@ -41,7 +41,7 @@ var projectName = 'proj-m2la-${environmentName}'
 // AVM: Cognitive Services Account (kind: AIServices)
 // Provisions the AI Services account with model deployments and UAMI role assignments
 // ---------------------------------------------------------------------------
-module aiServices 'br/public:avm/res/cognitive-services/account:0.13.0' = {
+module aiServices 'br/public:avm/res/cognitive-services/account:0.14.2' = {
   name: 'ais-${uniqueString(aiServicesName)}'
   params: {
     name: aiServicesName
@@ -52,6 +52,7 @@ module aiServices 'br/public:avm/res/cognitive-services/account:0.13.0' = {
     customSubDomainName: 'ais-m2la-${environmentName}-${uniqueString(resourceGroup().id)}'
     disableLocalAuth: true // AAD-only, no key-based auth
     publicNetworkAccess: 'Enabled'
+    allowProjectManagement: true // Required for AI Foundry project creation
     deployments: aiModelDeployments
     roleAssignments: [
       {
