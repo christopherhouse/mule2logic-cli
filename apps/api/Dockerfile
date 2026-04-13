@@ -3,6 +3,10 @@
 # ---------------------------------------------------------------------------
 # Stage 1: Build dependencies with uv
 # Stage 2: Slim runtime image
+#
+# Build context MUST be the repository root so that the path dependency on
+# packages/contracts is reachable:
+#   docker build -f apps/api/Dockerfile . --tag m2la-api
 # ---------------------------------------------------------------------------
 
 # --- Stage 1: Builder ---
@@ -11,19 +15,24 @@ FROM python:3.13-slim AS builder
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-WORKDIR /app
+WORKDIR /build
 
-# Copy dependency files first for layer caching
-COPY pyproject.toml ./
+# Mirror the repo layout so the relative path in pyproject.toml
+# (../../packages/contracts) resolves correctly.
+COPY packages/contracts/pyproject.toml packages/contracts/pyproject.toml
+COPY packages/contracts/src/ packages/contracts/src/
+
+# Copy API dependency files for layer caching
+COPY apps/api/pyproject.toml apps/api/pyproject.toml
 
 # Sync dependencies (production only, no dev deps)
-RUN uv sync --no-dev --no-install-project
+RUN cd apps/api && uv sync --no-dev --no-install-project
 
-# Copy application source
-COPY src/ ./src/
+# Copy API application source
+COPY apps/api/src/ apps/api/src/
 
 # Install project itself
-RUN uv sync --no-dev
+RUN cd apps/api && uv sync --no-dev
 
 # --- Stage 2: Runtime ---
 FROM python:3.13-slim AS runtime
@@ -34,10 +43,10 @@ RUN groupadd --system app && useradd --system --gid app app
 WORKDIR /app
 
 # Copy the virtual environment from the builder
-COPY --from=builder /app/.venv /app/.venv
+COPY --from=builder /build/apps/api/.venv /app/.venv
 
 # Copy application source
-COPY --from=builder /app/src /app/src
+COPY --from=builder /build/apps/api/src /app/src
 
 # Ensure the venv is on PATH
 ENV PATH="/app/.venv/bin:$PATH"
