@@ -1,6 +1,19 @@
 // ---------------------------------------------------------------------------
 // Module: ai-foundry.bicep — AI Services account + project + model deployments
-// Uses AVM for Cognitive Services account; raw Bicep for project (no AVM exists)
+// Raw Bicep (no AVM) — follows the official Microsoft Foundry quickstart pattern.
+// See: https://learn.microsoft.com/azure/foundry/how-to/create-resource-template
+//
+// Why raw Bicep instead of AVM?
+// - The AVM resource module (cognitive-services/account) does not manage child
+//   project resources. The hybrid AVM-account + raw-project approach caused
+//   InternalServerError during deployment because the project child resource
+//   used flat naming without a proper parent reference, and the preview API
+//   (2025-04-01-preview) was unstable.
+// - The AVM pattern module (ai-ml/ai-foundry) provisions an entire landing zone
+//   (VMs, VNets, Bastion, Cosmos DB, Key Vault, etc.) — far too heavy for our
+//   needs.
+// - Raw Bicep with the GA API (2025-06-01) and proper parent syntax is the
+//   simplest, most reliable approach.
 // ---------------------------------------------------------------------------
 
 @description('Environment name used for resource naming.')
@@ -41,69 +54,100 @@ var aiServicesName = 'ais-m2la-${environmentName}'
 var projectName = 'proj-m2la-${environmentName}'
 
 // ---------------------------------------------------------------------------
-// AVM: Cognitive Services Account (kind: AIServices)
-// Provisions the AI Services account with model deployments and UAMI role assignments
+// AI Services Account (kind: AIServices)
 // ---------------------------------------------------------------------------
-module aiServices 'br/public:avm/res/cognitive-services/account:0.14.2' = {
-  name: 'ais-${uniqueString(aiServicesName)}'
-  params: {
-    name: aiServicesName
-    location: location
-    tags: tags
-    kind: 'AIServices'
-    sku: 'S0'
+resource aiServicesAccount 'Microsoft.CognitiveServices/accounts@2025-06-01' = {
+  name: aiServicesName
+  location: location
+  tags: tags
+  kind: 'AIServices'
+  sku: {
+    name: 'S0'
+  }
+  properties: {
+    allowProjectManagement: true
     customSubDomainName: 'ais-m2la-${environmentName}-${uniqueString(resourceGroup().id)}'
     disableLocalAuth: true // AAD-only, no key-based auth
     publicNetworkAccess: 'Enabled'
-    allowProjectManagement: true // Required for AI Foundry project creation
-    deployments: aiModelDeployments
-    // Send all logs and metrics to Log Analytics
-    diagnosticSettings: [
-      {
-        name: 'allLogsAndMetrics'
-        logCategoriesAndGroups: [
-          { categoryGroup: 'allLogs' }
-        ]
-        metricCategories: [
-          { category: 'AllMetrics' }
-        ]
-        workspaceResourceId: logAnalyticsWorkspaceResourceId
-      }
-    ]
-    roleAssignments: [
-      {
-        principalId: uamiPrincipalId
-        roleDefinitionIdOrName: '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd' // Cognitive Services OpenAI User
-        principalType: 'ServicePrincipal'
-      }
-    ]
   }
 }
 
 // ---------------------------------------------------------------------------
-// Raw Bicep: AI Foundry Project (no AVM resource module exists for projects)
+// AI Foundry Project (child of AI Services account, using parent syntax)
 // ---------------------------------------------------------------------------
-resource aiFoundryProject 'Microsoft.CognitiveServices/accounts/projects@2025-04-01-preview' = {
-  name: '${aiServicesName}/${projectName}'
+resource aiFoundryProject 'Microsoft.CognitiveServices/accounts/projects@2025-06-01' = {
+  parent: aiServicesAccount
+  name: projectName
   location: location
   tags: tags
   properties: {
     displayName: 'MuleSoft to Logic Apps - ${environmentName}'
     description: 'AI Foundry project for the MuleSoft to Logic Apps migration platform.'
   }
-  dependsOn: [
-    aiServices
-  ]
+}
+
+// ---------------------------------------------------------------------------
+// Model Deployments
+// ---------------------------------------------------------------------------
+@batchSize(1) // Deploy models sequentially to avoid RP throttling
+resource modelDeployments 'Microsoft.CognitiveServices/accounts/deployments@2025-06-01' = [
+  for deployment in aiModelDeployments: {
+    parent: aiServicesAccount
+    name: deployment.name
+    sku: deployment.sku
+    properties: {
+      model: deployment.model
+    }
+  }
+]
+
+// ---------------------------------------------------------------------------
+// RBAC: Cognitive Services OpenAI User for UAMI
+// ---------------------------------------------------------------------------
+resource openAiUserRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: aiServicesAccount
+  name: guid(aiServicesAccount.id, uamiPrincipalId, '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd')
+  properties: {
+    principalId: uamiPrincipalId
+    roleDefinitionId: subscriptionResourceId(
+      'Microsoft.Authorization/roleDefinitions',
+      '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd' // Cognitive Services OpenAI User
+    )
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Diagnostic Settings — send all logs and metrics to Log Analytics
+// ---------------------------------------------------------------------------
+resource diagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+  scope: aiServicesAccount
+  name: 'allLogsAndMetrics'
+  properties: {
+    workspaceId: logAnalyticsWorkspaceResourceId
+    logs: [
+      {
+        categoryGroup: 'allLogs'
+        enabled: true
+      }
+    ]
+    metrics: [
+      {
+        category: 'AllMetrics'
+        enabled: true
+      }
+    ]
+  }
 }
 
 // ---------------------------------------------------------------------------
 // Outputs
 // ---------------------------------------------------------------------------
 @description('Name of the AI Foundry project.')
-output projectName string = projectName
+output projectName string = aiFoundryProject.name
 
 @description('Name of the AI Services account.')
-output aiServicesName string = aiServices.outputs.name
+output aiServicesName string = aiServicesAccount.name
 
 @description('AI Services account endpoint.')
-output aiServicesEndpoint string = aiServices.outputs.endpoint
+output aiServicesEndpoint string = aiServicesAccount.properties.endpoint

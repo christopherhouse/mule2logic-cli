@@ -15,20 +15,27 @@ infra/bicep/
     ├── monitoring.bicep         # Log Analytics + Application Insights
     ├── registry.bicep           # Azure Container Registry
     ├── container-apps.bicep     # Container Apps Environment + API App
-    └── ai-foundry.bicep         # AI Foundry hub + project + model deployments
+    └── ai-foundry.bicep         # AI Foundry account + project + model deployments (raw Bicep)
 ```
 
 ## Resources Provisioned
 
-| Resource | AVM Module | Purpose |
-|----------|-----------|----------|
-| UAMI | `avm.res.managed-identity.user-assigned-identity` | Workload identity (no secrets) |
-| Log Analytics | `avm.res.operational-insights.workspace` | Centralized logging |
-| Application Insights | `avm.res.insights.component` | APM and telemetry |
-| ACR | `avm.res.container-registry.registry` | Container image storage |
-| Container Apps Env | `avm.res.app.managed-environment` | Hosting environment |
-| Container App | `avm.res.app.container-app` | Backend API service |
-| AI Foundry | `avm.ptn.ai-ml.ai-foundry` | LLM model access for agents |
+| Resource | Module | Purpose |
+|----------|--------|----------|
+| UAMI | AVM `avm.res.managed-identity.user-assigned-identity` | Workload identity (no secrets) |
+| Log Analytics | AVM `avm.res.operational-insights.workspace` | Centralized logging |
+| Application Insights | AVM `avm.res.insights.component` | APM and telemetry |
+| ACR | AVM `avm.res.container-registry.registry` | Container image storage |
+| Container Apps Env | AVM `avm.res.app.managed-environment` | Hosting environment |
+| Container App | AVM `avm.res.app.container-app` | Backend API service |
+| AI Foundry | Raw Bicep (`Microsoft.CognitiveServices`) | LLM model access for agents |
+
+> **Note:** AI Foundry uses raw Bicep instead of AVM. The AVM pattern module
+> (`avm/ptn/ai-ml/ai-foundry`) deploys a full landing zone (VMs, VNets, etc.)
+> which is too heavy for this project. The AVM resource module
+> (`avm/res/cognitive-services/account`) does not manage child project resources,
+> and the hybrid AVM + raw child-resource approach caused deployment failures.
+> Raw Bicep with the GA API (`2025-06-01`) is the most reliable approach.
 
 ## Deployment
 
