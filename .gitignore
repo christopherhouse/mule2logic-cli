@@ -12,6 +12,9 @@ dist/
 # ruff
 .ruff_cache/
 
+# uv
+.python-version
+
 # IDE
 .vscode/
 .idea/
@@ -24,6 +27,9 @@ Thumbs.db
 
 # Node.js
 node_modules/
+
+# TypeScript
+*.tsbuildinfo
 
 # Environment
 .env
