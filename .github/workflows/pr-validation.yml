@@ -1,0 +1,105 @@
+# ---------------------------------------------------------------------------
+# PR Validation Workflow
+# ---------------------------------------------------------------------------
+# Runs on every pull request targeting main.
+# Validates Python (lint, test), TypeScript (lint, test, build), Bicep syntax,
+# and Docker build.
+# ---------------------------------------------------------------------------
+
+name: PR Validation
+
+on:
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  # -----------------------------------------------------------------------
+  # Python: lint + test
+  # -----------------------------------------------------------------------
+  python-checks:
+    name: Python Checks
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python + uv
+        uses: ./.github/actions/setup-python-uv
+        with:
+          working-directory: apps/api
+
+      - name: Lint (ruff check)
+        run: uv run ruff check .
+
+      - name: Format check (ruff format)
+        run: uv run ruff format --check .
+
+      - name: Test (pytest)
+        run: uv run pytest
+
+  # -----------------------------------------------------------------------
+  # TypeScript: lint + format + test + build
+  # -----------------------------------------------------------------------
+  typescript-checks:
+    name: TypeScript Checks
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/cli
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/cli/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Format check
+        run: npm run format
+
+      - name: Test
+        run: npm run test
+
+      - name: Build
+        run: npm run build
+
+  # -----------------------------------------------------------------------
+  # Bicep: syntax and type validation (no Azure creds needed)
+  # -----------------------------------------------------------------------
+  bicep-validate:
+    name: Bicep Validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bicep CLI
+        uses: azure/setup-bicep@v0.3.0
+
+      - name: Build / validate Bicep
+        run: az bicep build --file infra/bicep/main.bicep
+
+  # -----------------------------------------------------------------------
+  # Docker: verify image builds successfully (no push)
+  # -----------------------------------------------------------------------
+  docker-build-check:
+    name: Docker Build Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build API image
+        run: docker build -f apps/api/Dockerfile apps/api/ --tag m2la-api:pr-check

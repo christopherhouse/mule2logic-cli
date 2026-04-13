@@ -1,0 +1,128 @@
+# ---------------------------------------------------------------------------
+# Deployment Workflow
+# ---------------------------------------------------------------------------
+# Deploys infrastructure (Bicep) and application (Container App) to Azure.
+# Uses OIDC federated identity — no stored secrets for Azure auth.
+#
+# Triggers:
+#   - Push to main (auto-deploy to dev)
+#   - Manual dispatch with environment selector
+# ---------------------------------------------------------------------------
+
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        required: true
+        type: choice
+        options:
+          - dev
+          - test
+          - prod
+        default: dev
+
+permissions:
+  id-token: write # Required for OIDC federated credentials
+  contents: read
+
+env:
+  # Default to dev for push-triggered runs
+  DEPLOY_ENV: ${{ github.event.inputs.environment || 'dev' }}
+
+jobs:
+  # -----------------------------------------------------------------------
+  # Job 1: Deploy Infrastructure (Bicep)
+  # -----------------------------------------------------------------------
+  deploy-infra:
+    name: Deploy Infrastructure (${{ github.event.inputs.environment || 'dev' }})
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+    outputs:
+      acr-login-server: ${{ steps.deploy.outputs.acrLoginServer }}
+      acr-name: ${{ steps.deploy.outputs.acrName }}
+      app-name: ${{ steps.deploy.outputs.apiAppName }}
+      resource-group: ${{ vars.AZURE_RESOURCE_GROUP_NAME }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy Bicep
+        id: deploy
+        uses: azure/arm-deploy@v2
+        with:
+          scope: resourcegroup
+          resourceGroupName: ${{ vars.AZURE_RESOURCE_GROUP_NAME }}
+          template: infra/bicep/main.bicep
+          parameters: >-
+            infra/bicep/main.${{ env.DEPLOY_ENV }}.bicepparam
+          deploymentName: m2la-${{ env.DEPLOY_ENV }}-${{ github.run_number }}
+          failOnStdErr: false
+
+  # -----------------------------------------------------------------------
+  # Job 2: Build and Push Container Image to ACR
+  # -----------------------------------------------------------------------
+  build-push-image:
+    name: Build & Push Image
+    runs-on: ubuntu-latest
+    needs: deploy-infra
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Compute image tag
+        id: meta
+        run: |
+          TAG="${{ github.sha }}"
+          echo "tag=${TAG:0:7}" >> "$GITHUB_OUTPUT"
+
+      - name: Build & push with ACR
+        run: |
+          az acr build \
+            --registry ${{ needs.deploy-infra.outputs.acr-name }} \
+            --image m2la-api:${{ steps.meta.outputs.tag }} \
+            --image m2la-api:latest \
+            --file apps/api/Dockerfile \
+            apps/api/
+
+  # -----------------------------------------------------------------------
+  # Job 3: Deploy to Container Apps
+  # -----------------------------------------------------------------------
+  deploy-app:
+    name: Deploy Container App
+    runs-on: ubuntu-latest
+    needs: [deploy-infra, build-push-image]
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+    steps:
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Update Container App image
+        run: |
+          az containerapp update \
+            --name ${{ needs.deploy-infra.outputs.app-name }} \
+            --resource-group ${{ needs.deploy-infra.outputs.resource-group }} \
+            --image ${{ needs.deploy-infra.outputs.acr-login-server }}/m2la-api:${{ needs.build-push-image.outputs.image-tag }}

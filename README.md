@@ -165,10 +165,26 @@ npm test
 - **Built-in Logic Apps connectors preferred** with identity-based authentication
 - **OpenTelemetry** for end-to-end observability
 
+## Infrastructure & Deployment
+
+Infrastructure is defined in `infra/bicep/` using Azure Verified Modules (AVM). CI/CD uses GitHub Actions with OIDC federated identity.
+
+- [Deployment Guide](docs/deployment.md) — OIDC setup, manual deployment, CI/CD overview
+- [Infrastructure README](infra/bicep/README.md) — Bicep module structure and parameters
+
+### CI/CD Workflows
+
+| Workflow | Trigger | Purpose |
+|----------|---------|----------|
+| PR Validation | Pull request | Lint, test, build, Bicep validate, Docker build |
+| Deploy | Push to main / manual | Deploy infra → build image → update Container App |
+| Bicep What-If | PR with infra changes | Infrastructure diff in PR comment |
+
 ## Documentation
 
 - [Product Specification](docs/mule2logic-cli-spec.md)
 - [Implementation Plan](docs/copilot-coding-agent-implementation-plan.md)
+- [Deployment Guide](docs/deployment.md)
 
 ## License
 

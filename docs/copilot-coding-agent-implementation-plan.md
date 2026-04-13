@@ -363,7 +363,19 @@ Output:
 
 ---
 
-## PR-002 — Azure Infrastructure & CI/CD
+## PR-002 — Azure Infrastructure & CI/CD ✅ COMPLETE
+
+**Completed: 2026-04-13**
+
+Delivered all infrastructure and CI/CD:
+- Bicep modules using AVM exclusively: identity (UAMI), monitoring (Log Analytics + App Insights), registry (ACR), container-apps (CAE + Container App), ai-foundry (hub + project + GPT-4o deployment at 50K TPM)
+- Environment parameter files for dev/test/prod (`main.{dev,test,prod}.bicepparam`)
+- Multi-stage Dockerfile for API using `uv` (no pip), non-root user
+- GitHub Actions: PR validation (Python lint/test, TypeScript lint/test/build, Bicep validate, Docker build check), deploy workflow (OIDC, Bicep deploy, ACR cloud build, Container App update), Bicep what-if (separate workflow, only on infra changes)
+- Composite action `.github/actions/setup-python-uv` for reusable Python+uv setup
+- Deployment documentation (`docs/deployment.md`) with OIDC setup, manual deploy, CI/CD overview, troubleshooting
+- Updated root README and infra README
+- No deviations from scope. All resources use UAMI only, no secrets. OIDC federated identity for all Azure auth in CI/CD.
 
 ### Goal
 Stand up production-ready Azure infrastructure and CI/CD pipelines immediately after scaffolding, so every subsequent PR can be validated, built, and deployed automatically. Infra and CI/CD land early and evolve incrementally as features are added.
