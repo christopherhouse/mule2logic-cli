@@ -711,7 +711,9 @@ Add representative tests for both modes using sample Mule projects and standalon
 
 ---
 
-## PR-007 — Intermediate Representation (IR) v1
+## PR-007 — Intermediate Representation (IR) v1 ✅ COMPLETE
+
+> **Completed**: 2026-04-13. Delivered IR v1 at `services/ir/` with 74 tests across 6 modules. All IR entities implemented as Pydantic models with discriminated union FlowStep type. JSON serialization roundtrip is lossless. Builder helpers provide convenient construction for tests and future parser integration. Message state tracking deferred to a follow-up (config dicts on nodes can carry this later). No deviations from scope.
 
 ### Goal
 Create a canonical, deterministic Mule IR.
