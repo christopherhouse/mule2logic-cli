@@ -93,6 +93,8 @@ module containerApp 'br/public:avm/res/app/container-app:0.12.0' = {
       {
         name: 'm2la-api'
         image: containerImage
+        // 0.5 vCPU / 1 GiB fits the Consumption profile minimum; sufficient for
+        // the FastAPI-based translation API under moderate load.
         resources: {
           cpu: '0.5'
           memory: '1Gi'
@@ -128,7 +130,7 @@ module containerApp 'br/public:avm/res/app/container-app:0.12.0' = {
           name: 'http-scaling'
           http: {
             metadata: {
-              concurrentRequests: '50'
+              concurrentRequests: '50' // scale out when a replica handles ≥ 50 concurrent requests
             }
           }
         }
