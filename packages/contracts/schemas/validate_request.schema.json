@@ -1,0 +1,69 @@
+{
+  "$defs": {
+    "TelemetryContext": {
+      "description": "Telemetry correlation metadata propagated across CLI, API, and services.",
+      "properties": {
+        "trace_id": {
+          "description": "OpenTelemetry trace ID",
+          "title": "Trace Id",
+          "type": "string"
+        },
+        "span_id": {
+          "description": "OpenTelemetry span ID",
+          "title": "Span Id",
+          "type": "string"
+        },
+        "correlation_id": {
+          "description": "Platform correlation ID (UUID)",
+          "title": "Correlation Id",
+          "type": "string"
+        },
+        "parent_span_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Parent span ID for nested operations",
+          "title": "Parent Span Id"
+        }
+      },
+      "required": [
+        "trace_id",
+        "span_id",
+        "correlation_id"
+      ],
+      "title": "TelemetryContext",
+      "type": "object"
+    }
+  },
+  "description": "Request to validate generated Logic Apps artifacts.",
+  "properties": {
+    "output_directory": {
+      "description": "Path to the output directory containing generated artifacts",
+      "title": "Output Directory",
+      "type": "string"
+    },
+    "telemetry": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/TelemetryContext"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Telemetry context for trace propagation"
+    }
+  },
+  "required": [
+    "output_directory"
+  ],
+  "title": "ValidateRequest",
+  "type": "object"
+}

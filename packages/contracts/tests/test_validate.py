@@ -5,11 +5,38 @@ from pydantic import ValidationError
 
 from m2la_contracts.enums import Severity
 from m2la_contracts.telemetry import TelemetryContext
-from m2la_contracts.validate import ValidationIssue, ValidationReport
+from m2la_contracts.validate import ValidateRequest, ValidationIssue, ValidationReport
 
 
 def _make_telemetry() -> TelemetryContext:
     return TelemetryContext(trace_id="t1", span_id="s1", correlation_id="c1")
+
+
+class TestValidateRequest:
+    """Tests for ValidateRequest model."""
+
+    def test_minimal(self) -> None:
+        req = ValidateRequest(output_directory="/tmp/output")
+        assert req.output_directory == "/tmp/output"
+        assert req.telemetry is None
+
+    def test_with_telemetry(self) -> None:
+        req = ValidateRequest(
+            output_directory="/tmp/output",
+            telemetry=_make_telemetry(),
+        )
+        assert req.telemetry is not None
+        assert req.telemetry.trace_id == "t1"
+
+    def test_missing_output_directory(self) -> None:
+        with pytest.raises(ValidationError):
+            ValidateRequest()  # type: ignore[call-arg]
+
+    def test_json_roundtrip(self) -> None:
+        req = ValidateRequest(output_directory="/tmp/output", telemetry=_make_telemetry())
+        json_str = req.model_dump_json()
+        restored = ValidateRequest.model_validate_json(json_str)
+        assert restored == req
 
 
 class TestValidationIssue:

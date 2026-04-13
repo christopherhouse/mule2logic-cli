@@ -1,9 +1,11 @@
 """MuleSoft to Logic Apps Standard Migration API entrypoint."""
 
-import os
-
 import uvicorn
 from fastapi import FastAPI
+
+from m2la_api.config.settings import get_settings
+from m2la_api.models.errors import ApiError, api_error_handler
+from m2la_api.routes import analyze_router, health_router, transform_router, validate_router
 
 app = FastAPI(
     title="MuleSoft to Logic Apps Migration API",
@@ -11,18 +13,20 @@ app = FastAPI(
     version="0.1.0",
 )
 
+# Register routers
+app.include_router(health_router)
+app.include_router(analyze_router)
+app.include_router(transform_router)
+app.include_router(validate_router)
 
-@app.get("/health")
-async def health() -> dict[str, str]:
-    """Health check endpoint."""
-    return {"status": "healthy"}
+# Register exception handlers
+app.add_exception_handler(ApiError, api_error_handler)  # type: ignore[arg-type]
 
 
 def main() -> None:
     """Run the API server."""
-    host = os.getenv("M2LA_HOST", "127.0.0.1")
-    port = int(os.getenv("M2LA_PORT", "8000"))
-    uvicorn.run("m2la_api.main:app", host=host, port=port, reload=True)
+    settings = get_settings()
+    uvicorn.run("m2la_api.main:app", host=settings.host, port=settings.port, reload=settings.debug)
 
 
 if __name__ == "__main__":

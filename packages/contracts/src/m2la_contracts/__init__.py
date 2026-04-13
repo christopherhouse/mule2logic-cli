@@ -10,7 +10,7 @@ from m2la_contracts.enums import ConstructCategory, GapCategory, InputMode, Seve
 from m2la_contracts.helpers import detect_input_mode
 from m2la_contracts.telemetry import TelemetryContext
 from m2la_contracts.transform import TransformRequest, TransformResponse
-from m2la_contracts.validate import ValidationIssue, ValidationReport
+from m2la_contracts.validate import ValidateRequest, ValidationIssue, ValidationReport
 
 __all__ = [
     # Enums
@@ -34,6 +34,7 @@ __all__ = [
     "TransformRequest",
     "TransformResponse",
     # Validate
+    "ValidateRequest",
     "ValidationIssue",
     "ValidationReport",
     # Helpers
