@@ -529,7 +529,9 @@ Do not yet implement parser/transform logic.
 
 ---
 
-## PR-004 — Backend API Skeleton
+## PR-004 — Backend API Skeleton ✅ COMPLETE
+
+> **Completed 2026-04-13.** All routes (health, analyze, transform, validate) implemented as FastAPI routers with auto-detect input mode. Added `ValidateRequest` to contracts package (Python + TypeScript + JSON schema). Config via `pydantic-settings`, structured `ErrorResponse`/`ApiError` error handling. 26 API tests passing. No deviations from scope.
 
 ### Goal
 Stand up FastAPI routes and application configuration.
