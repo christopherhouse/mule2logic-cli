@@ -31,6 +31,9 @@ param aiModelDeploymentSkuName string = 'GlobalStandard'
 @description('Capacity (K TPM) for the GPT-4o model deployment.')
 param aiModelDeploymentCapacity int = 30
 
+@description('Container image for the API app. Defaults to a placeholder; overridden by deploy script.')
+param containerImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
+
 // ---------------------------------------------------------------------------
 // Computed values
 // ---------------------------------------------------------------------------
@@ -82,7 +85,7 @@ module registry 'modules/registry.bicep' = {
 }
 
 // ---------------------------------------------------------------------------
-// Module: Container Apps (Environment only — app deployed via script)
+// Module: Container Apps (Environment + API Container App)
 // ---------------------------------------------------------------------------
 module containerApps 'modules/container-apps.bicep' = {
   name: 'container-apps'
@@ -92,6 +95,10 @@ module containerApps 'modules/container-apps.bicep' = {
     tags: defaultTags
     logAnalyticsWorkspaceResourceId: monitoring.outputs.logAnalyticsWorkspaceResourceId
     appInsightsConnectionString: monitoring.outputs.appInsightsConnectionString
+    uamiResourceId: identity.outputs.resourceId
+    uamiClientId: identity.outputs.clientId
+    acrLoginServer: registry.outputs.loginServer
+    containerImage: containerImage
   }
 }
 
@@ -138,9 +145,15 @@ output acrLoginServer string = registry.outputs.loginServer
 @description('ACR name.')
 output acrName string = registry.outputs.name
 
-// Container Apps Environment
+// Container Apps
 @description('Container Apps Environment name.')
 output containerAppsEnvironmentName string = containerApps.outputs.environmentName
+
+@description('Container App name.')
+output containerAppName string = containerApps.outputs.appName
+
+@description('Container App FQDN.')
+output containerAppFqdn string = containerApps.outputs.appFqdn
 
 // AI Foundry
 @description('AI Services account name.')

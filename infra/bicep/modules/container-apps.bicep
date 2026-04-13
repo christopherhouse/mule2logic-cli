@@ -1,10 +1,8 @@
 // ---------------------------------------------------------------------------
-// Module: container-apps.bicep — Container Apps Managed Environment (AVM)
+// Module: container-apps.bicep — Container Apps Environment + API Container App
 // ---------------------------------------------------------------------------
-// Deploys ONLY the Container Apps Environment. The Container App itself is
-// deployed via the infra/scripts/deploy-container-app.sh script after the
-// container image is pushed to ACR. This separation avoids Bicep deployment
-// failures when the container image or app configuration changes.
+// Deploys the Container Apps Managed Environment (AVM) and the API Container
+// App with UAMI identity attached and ACR identity-based image pull configured.
 // ---------------------------------------------------------------------------
 
 @description('Environment name used for resource naming.')
@@ -22,10 +20,23 @@ param logAnalyticsWorkspaceResourceId string
 @description('Application Insights connection string for environment-level telemetry.')
 param appInsightsConnectionString string
 
+@description('Resource ID of the User Assigned Managed Identity.')
+param uamiResourceId string
+
+@description('Client ID of the User Assigned Managed Identity.')
+param uamiClientId string
+
+@description('ACR login server (e.g. acrm2ladev.azurecr.io).')
+param acrLoginServer string
+
+@description('Container image for the API app. Defaults to a placeholder; overridden by deploy script.')
+param containerImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
+
 // ---------------------------------------------------------------------------
 // Naming
 // ---------------------------------------------------------------------------
 var envName = 'cae-m2la-${environmentName}'
+var appName = 'ca-m2la-api-${environmentName}'
 
 // ---------------------------------------------------------------------------
 // AVM: Container Apps Managed Environment
@@ -50,6 +61,86 @@ module containerEnv 'br/public:avm/res/app/managed-environment:0.8.1' = {
 }
 
 // ---------------------------------------------------------------------------
+// AVM: Container App — API
+// ---------------------------------------------------------------------------
+// Uses UAMI for identity and ACR image pull (no admin credentials).
+// The environmentResourceId reference ensures the environment is created first.
+// ---------------------------------------------------------------------------
+module containerApp 'br/public:avm/res/app/container-app:0.12.0' = {
+  name: 'ca-${uniqueString(appName)}'
+  params: {
+    name: appName
+    environmentResourceId: containerEnv.outputs.resourceId
+    location: location
+    tags: tags
+
+    // Attach UAMI — used for ACR pull and Azure SDK DefaultAzureCredential
+    managedIdentities: {
+      userAssignedResourceIds: [
+        uamiResourceId
+      ]
+    }
+
+    // Identity-based ACR image pull (no admin credentials / passwords)
+    registries: [
+      {
+        server: acrLoginServer
+        identity: uamiResourceId
+      }
+    ]
+
+    containers: [
+      {
+        name: 'm2la-api'
+        image: containerImage
+        resources: {
+          cpu: '0.5'
+          memory: '1Gi'
+        }
+        env: [
+          {
+            name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+            value: appInsightsConnectionString
+          }
+          {
+            name: 'AZURE_CLIENT_ID'
+            value: uamiClientId
+          }
+          {
+            name: 'ENVIRONMENT'
+            value: environmentName
+          }
+        ]
+      }
+    ]
+
+    // Ingress — external HTTP on port 8000
+    ingressExternal: true
+    ingressTargetPort: 8000
+    ingressTransport: 'auto'
+
+    // Scaling — scale to zero, burst to 10 replicas on HTTP load
+    scaleSettings: {
+      minReplicas: 0
+      maxReplicas: 10
+      rules: [
+        {
+          name: 'http-scaling'
+          http: {
+            metadata: {
+              concurrentRequests: '50'
+            }
+          }
+        }
+      ]
+    }
+
+    // Run on the Consumption workload profile defined in the environment
+    workloadProfileName: 'Consumption'
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Outputs
 // ---------------------------------------------------------------------------
 @description('Name of the Container Apps Environment.')
@@ -57,3 +148,9 @@ output environmentName string = containerEnv.outputs.name
 
 @description('Resource ID of the Container Apps Environment.')
 output environmentResourceId string = containerEnv.outputs.resourceId
+
+@description('Name of the Container App.')
+output appName string = containerApp.outputs.name
+
+@description('FQDN of the Container App.')
+output appFqdn string = containerApp.outputs.fqdn
