@@ -14,6 +14,10 @@
 //   needs.
 // - Raw Bicep with the GA API (2025-06-01) and proper parent syntax is the
 //   simplest, most reliable approach.
+//
+// Important: Both the AI Services account AND the project resource require a
+// managed identity. The error "you must enable a managed identity on your
+// resource" occurs if the project lacks an identity block.
 // ---------------------------------------------------------------------------
 
 @description('Environment name used for resource naming.')
@@ -89,6 +93,12 @@ resource aiFoundryProject 'Microsoft.CognitiveServices/accounts/projects@2025-06
   name: projectName
   location: location
   tags: tags
+  identity: {
+    type: 'UserAssigned'
+    userAssignedIdentities: {
+      '${uamiResourceId}': {}
+    }
+  }
   properties: {
     displayName: 'MuleSoft to Logic Apps - ${environmentName}'
     description: 'AI Foundry project for the MuleSoft to Logic Apps migration platform.'
