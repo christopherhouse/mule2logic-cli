@@ -6,6 +6,7 @@ requires-python = ">=3.13"
 dependencies = [
     "pydantic>=2.0",
     "m2la-contracts",
+    "defusedxml>=0.7.1",
 ]
 
 [tool.uv.sources]

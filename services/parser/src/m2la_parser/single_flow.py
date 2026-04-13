@@ -1,8 +1,9 @@
 """Single-flow mode: parse a standalone Mule XML file."""
 
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as StdET
 from pathlib import Path
 
+import defusedxml.ElementTree as ET
 from m2la_contracts.common import Warning
 from m2la_contracts.enums import InputMode, Severity
 
@@ -86,7 +87,7 @@ def parse_single_flow(xml_path: str) -> ProjectInventory:
 
     # Check property placeholders — all are unresolvable in single-flow mode
     try:
-        tree = ET.parse(path)  # noqa: S314
+        tree = ET.parse(path)
         root = tree.getroot()
         property_refs = extract_property_placeholders(root)
         for prop in property_refs:
@@ -98,7 +99,7 @@ def parse_single_flow(xml_path: str) -> ProjectInventory:
                     source_location=str(path),
                 )
             )
-    except ET.ParseError:
+    except StdET.ParseError:
         pass  # Already warned about malformed XML
 
     return ProjectInventory(

@@ -1,8 +1,9 @@
 """Project mode: discover and parse a full MuleSoft project."""
 
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as StdET
 from pathlib import Path
 
+import defusedxml.ElementTree as ET
 from m2la_contracts.common import Warning
 from m2la_contracts.enums import InputMode, Severity
 
@@ -130,11 +131,11 @@ def discover_project(project_root: str) -> ProjectInventory:
     if mule_dir.exists():
         for xml_file in sorted(mule_dir.rglob("*.xml")):
             try:
-                tree = ET.parse(xml_file)  # noqa: S314
+                tree = ET.parse(xml_file)
                 root_el = tree.getroot()
                 for prop in extract_property_placeholders(root_el):
                     all_property_refs.add(prop)
-            except ET.ParseError:
+            except StdET.ParseError:
                 pass  # Already warned about malformed XML
 
     for prop in sorted(all_property_refs):

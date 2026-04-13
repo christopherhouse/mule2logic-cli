@@ -1,8 +1,9 @@
 """Parse pom.xml to extract project metadata and connector dependencies."""
 
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as StdET
 from pathlib import Path
 
+import defusedxml.ElementTree as ET
 from m2la_contracts.common import Warning
 from m2la_contracts.enums import Severity
 
@@ -46,8 +47,8 @@ def parse_pom(pom_path: Path) -> tuple[ProjectMetadata | None, list[Warning]]:
         return None, warnings
 
     try:
-        tree = ET.parse(pom_path)  # noqa: S314
-    except ET.ParseError as e:
+        tree = ET.parse(pom_path)
+    except StdET.ParseError as e:
         warnings.append(
             Warning(
                 code="MALFORMED_POM",

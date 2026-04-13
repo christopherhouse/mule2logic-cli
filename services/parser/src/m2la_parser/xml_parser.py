@@ -1,9 +1,10 @@
 """Parse Mule flow XML files to extract flows, sub-flows, global elements, and connector configs."""
 
 import re
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as StdET
 from pathlib import Path
 
+import defusedxml.ElementTree as ET
 from m2la_contracts.common import Warning
 from m2la_contracts.enums import Severity
 
@@ -52,8 +53,8 @@ def parse_mule_xml(
 
     # Parse XML
     try:
-        tree = ET.parse(xml_path)  # noqa: S314
-    except ET.ParseError as e:
+        tree = ET.parse(xml_path)
+    except StdET.ParseError as e:
         warnings.append(
             Warning(
                 code="MALFORMED_XML",
