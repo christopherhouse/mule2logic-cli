@@ -142,7 +142,7 @@ export function printValidationResult(report: ValidationReport): void {
   if (report.issues.length > 0) {
     console.log();
     for (const issue of report.issues) {
-      const icon = issue.severity === "error" || issue.severity === "critical" ? "❌" : "⚠️ ";
+      const icon = issue.severity === "error" || issue.severity === "critical" ? "❌" : "⚠️";
       const colorFn =
         issue.severity === "error" || issue.severity === "critical" ? chalk.red : chalk.yellow;
       const location = issue.artifact_path ? ` (${issue.artifact_path})` : "";

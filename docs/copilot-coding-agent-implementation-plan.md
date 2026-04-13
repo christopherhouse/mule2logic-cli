@@ -581,7 +581,11 @@ Add tests for route availability and response shape.
 
 ---
 
-## PR-005 — CLI Skeleton with Polished UX
+## PR-005 — CLI Skeleton with Polished UX ✅ COMPLETE
+
+**Completed: 2026-04-13**
+
+Delivered as planned. Added commander for CLI framework, ora for spinners, fast-xml-parser for XML validation. Implemented three commands (analyze, transform, validate) with auto-detection of project vs single-flow mode. Input validation checks pom.xml + src/main/mule/ for project mode and <flow>/<sub-flow> elements for single-flow mode. Backend URL configurable via --backend-url flag or M2LA_BACKEND_URL env var. Colorful output with chalk, emoji/icons, progress spinners, and structured error handling with CliError class. 36 tests (config, input-detector, input-validator, commands, output, banner). No deviations from scope.
 
 ### Goal
 Build a polished TypeScript CLI shell.
