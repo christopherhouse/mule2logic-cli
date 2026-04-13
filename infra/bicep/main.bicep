@@ -89,6 +89,7 @@ module registry 'modules/registry.bicep' = {
     tags: defaultTags
     uamiPrincipalId: identity.outputs.principalId
     skuName: acrSkuName
+    logAnalyticsWorkspaceResourceId: monitoring.outputs.logAnalyticsWorkspaceResourceId
   }
 }
 
@@ -121,6 +122,7 @@ module aiFoundry 'modules/ai-foundry.bicep' = {
     tags: defaultTags
     uamiPrincipalId: identity.outputs.principalId
     aiModelDeployments: aiModelDeployments
+    logAnalyticsWorkspaceResourceId: monitoring.outputs.logAnalyticsWorkspaceResourceId
   }
 }
 
