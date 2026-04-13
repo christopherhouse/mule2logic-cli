@@ -6,7 +6,11 @@ requires-python = ">=3.13"
 dependencies = [
     "fastapi",
     "uvicorn[standard]",
+    "m2la-contracts",
 ]
+
+[tool.uv.sources]
+m2la-contracts = { path = "../../packages/contracts", editable = true }
 
 [dependency-groups]
 dev = [

@@ -45,6 +45,18 @@
       "message": "DataWeave transformation may require manual review",
       "severity": "warning",
       "source_location": "order-process.xml:25"
+    },
+    {
+      "code": "MISSING_CONNECTOR_CONFIG",
+      "message": "Connector configurations are unavailable in single-flow mode; external connector references cannot be resolved",
+      "severity": "warning",
+      "source_location": null
+    },
+    {
+      "code": "MISSING_PROPERTY_FILES",
+      "message": "Property files are unavailable in single-flow mode; property placeholders cannot be resolved",
+      "severity": "warning",
+      "source_location": null
     }
   ],
   "telemetry": {

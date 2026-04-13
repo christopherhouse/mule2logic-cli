@@ -469,7 +469,9 @@ Add deployment docs.
 
 ---
 
-## PR-003 — Shared Contracts and JSON Schemas
+## PR-003 — Shared Contracts and JSON Schemas ✅ COMPLETE
+
+> **Completed**: 2026-04-13. Delivered as planned. Python Pydantic models as source of truth, generated JSON schemas, hand-authored TypeScript interfaces. 92 Python tests + 11 TypeScript tests. Wired into apps/api (path dependency) and apps/cli (@m2la/contracts). CI updated with contracts-specific jobs.
 
 ### Goal
 Define DTOs and schemas for analysis, transformation, validation, and output packaging.
