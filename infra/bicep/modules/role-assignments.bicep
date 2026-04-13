@@ -10,11 +10,11 @@
 @description('Principal ID of the User Assigned Managed Identity.')
 param principalId string
 
-@description('Resource ID of the Azure Container Registry.')
-param containerRegistryId string
+@description('Name of the Azure Container Registry (extracted from resource ID).')
+param containerRegistryName string
 
-@description('Resource ID of the AI Services (Cognitive Services) account.')
-param aiServicesId string
+@description('Name of the AI Services account (extracted from resource ID).')
+param aiServicesAccountName string
 
 // ---------------------------------------------------------------------------
 // Well-known built-in role definition IDs
@@ -37,11 +37,22 @@ var cognitiveServicesOpenAIUserRoleId = subscriptionResourceId(
 )
 
 // ---------------------------------------------------------------------------
+// Existing resource references for scoping
+// ---------------------------------------------------------------------------
+resource containerRegistry 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = {
+  name: containerRegistryName
+}
+
+resource aiServicesAccount 'Microsoft.CognitiveServices/accounts@2024-10-01' existing = {
+  name: aiServicesAccountName
+}
+
+// ---------------------------------------------------------------------------
 // 1. AcrPull on Azure Container Registry
 // ---------------------------------------------------------------------------
 resource acrPullAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   // Deterministic name using a GUID seeded from the principal, registry, and role
-  name: guid(containerRegistryId, principalId, acrPullRoleId)
+  name: guid(containerRegistry.id, principalId, acrPullRoleId)
   scope: containerRegistry
   properties: {
     roleDefinitionId: acrPullRoleId
@@ -55,25 +66,13 @@ resource acrPullAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' 
 // ---------------------------------------------------------------------------
 resource openAIUserAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   // Deterministic name using a GUID seeded from the principal, AI Services, and role
-  name: guid(aiServicesId, principalId, cognitiveServicesOpenAIUserRoleId)
+  name: guid(aiServicesAccount.id, principalId, cognitiveServicesOpenAIUserRoleId)
   scope: aiServicesAccount
   properties: {
     roleDefinitionId: cognitiveServicesOpenAIUserRoleId
     principalId: principalId
     principalType: 'ServicePrincipal' // Managed identities use ServicePrincipal type
   }
-}
-
-// ---------------------------------------------------------------------------
-// Existing resource references for scoping
-// ---------------------------------------------------------------------------
-// Extract the resource name from the full resource ID for the `existing` reference
-resource containerRegistry 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = {
-  name: last(split(containerRegistryId, '/'))!
-}
-
-resource aiServicesAccount 'Microsoft.CognitiveServices/accounts@2024-10-01' existing = {
-  name: last(split(aiServicesId, '/'))!
 }
 
 // ---------------------------------------------------------------------------

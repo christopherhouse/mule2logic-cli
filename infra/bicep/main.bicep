@@ -234,8 +234,8 @@ module roleAssignments 'modules/role-assignments.bicep' = {
   name: 'module-role-assignments'
   params: {
     principalId: managedIdentity.outputs.principalId
-    containerRegistryId: containerRegistry.outputs.registryId
-    aiServicesId: aiServices.outputs.aiServicesId
+    containerRegistryName: containerRegistry.outputs.registryName
+    aiServicesAccountName: aiServices.outputs.aiServicesName
   }
 }
 

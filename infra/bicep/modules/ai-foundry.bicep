@@ -32,10 +32,16 @@ param appInsightsId string
 // Storage Account for AI Foundry Hub (required dependency)
 // Raw Bicep — simple storage account, no AVM needed for a private dependency.
 // ---------------------------------------------------------------------------
+
+// Storage account names: 3–24 chars, lowercase alphanumeric only, globally unique.
+var sanitizedHubName = replace(replace(toLower(hubName), '-', ''), '_', '')
+var storageAccountName = take('st${sanitizedHubName}sa', 24)
+
+// Key Vault names: 3–24 chars, alphanumeric and hyphens, globally unique.
+var keyVaultName = take('kv${sanitizedHubName}', 24)
+
 resource hubStorage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
-  // Storage account names: 3–24 chars, alphanumeric only, globally unique.
-  // The take() + replace() ensures we meet the min-length constraint.
-  name: take('st${replace(replace(hubName, '-', ''), '_', '')}sa', 24)
+  name: storageAccountName
   location: location
   tags: tags
   sku: {
@@ -55,7 +61,7 @@ resource hubStorage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
 // Raw Bicep — simple Key Vault, required by the ML workspace.
 // ---------------------------------------------------------------------------
 resource hubKeyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
-  name: take('kv-${hubName}', 24)
+  name: keyVaultName
   location: location
   tags: tags
   properties: {
