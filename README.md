@@ -4,9 +4,10 @@
 
 **Migrate MuleSoft flows → Azure Logic Apps Standard workflows with AI ✨**
 
-[![Python](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![Agent Framework](https://img.shields.io/badge/Microsoft-Agent%20Framework-0078D4?logo=microsoftazure&logoColor=white)](https://learn.microsoft.com/agent-framework/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Node.js](https://img.shields.io/badge/Node.js-18%2B-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5%2B-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![GitHub Copilot](https://img.shields.io/badge/Powered%20by-GitHub%20Copilot-8957e5?logo=github)](https://github.com/features/copilot)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/christopherhouse/mule2logic-cli/pulls)
 [![Experimental](https://img.shields.io/badge/Status-Experimental-orange)]()
 
@@ -24,15 +25,13 @@
 
 ## ⚠️ Disclaimer
 
-> **This project is experimental and under active development.** It uses AI (Microsoft Agent Framework + Azure Foundry) to generate Logic Apps JSON from MuleSoft XML. AI-generated output can be incorrect, incomplete, or subtly wrong. **Do not deploy the output to production without thorough manual review and testing.** There are no guarantees that any conversion is correct. Use at your own risk.
+> **This project is experimental and under active development.** It uses AI (GitHub Copilot SDK) to generate Logic Apps JSON from MuleSoft XML. AI-generated output can be incorrect, incomplete, or subtly wrong. **Do not deploy the output to production without thorough manual review and testing.** There are no guarantees that any conversion is correct. Use at your own risk.
 
 ## 🤔 What is this?
 
-`mule2logic` is an experimental Python CLI that uses the **Microsoft Agent Framework SDK** — grounded with [Microsoft Learn MCP](https://learn.microsoft.com/api/mcp) and [Context7 MCP](https://mcp.context7.com) — to convert MuleSoft XML flow definitions into Azure Logic Apps Standard workflow JSON.
+`mule2logic` is an experimental Node.js CLI that uses the **GitHub Copilot SDK** — grounded with [Microsoft Learn MCP](https://learn.microsoft.com/api/mcp) and [Context7 MCP](https://mcp.context7.com) — to convert MuleSoft XML flow definitions into Azure Logic Apps Standard workflow JSON.
 
 The tool *attempts* to handle a wide range of MuleSoft components: connectors, processors, routers, scopes, error handlers, DataWeave transformations, and enterprise integration patterns. A built-in QC review agent does a second pass on every conversion, but this is best-effort — **always review the output yourself**.
-
-> **Architecture note:** The project is split into two packages — `mule2logic_agent` (the conversion engine) and `mule2logic_cli` (the thin CLI shell). This design enables future deployment of the agent as a standalone container app / API service.
 
 ### 🧩 MuleSoft → Logic Apps Coverage (Aspirational)
 
@@ -131,107 +130,96 @@ Content-based routing, message enrichment, splitter/aggregator, idempotent filte
 
 ### Prerequisites
 
-- **[uv](https://docs.astral.sh/uv/)** — Python package & project manager (handles Python installation too)
-- **Azure AI Foundry project** — with a deployed model (e.g., `gpt-4o`)
-- **Azure CLI** — logged in via `az login` (for authentication)
+- **Node.js 18+** — [Download](https://nodejs.org/)
+- **GitHub Copilot SDK access** — needed for AI-powered conversion
 
-### 1. Install uv
+### Installation
 
-If you don't already have [uv](https://docs.astral.sh/uv/), install it first:
+#### Option 1: Run instantly with `npx` (no install needed)
 
 ```bash
-# macOS / Linux
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Windows (PowerShell)
-powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+npx mule2logic-cli convert flow.xml --pretty
 ```
 
-> **Note:** uv will manage the Python installation for you — no need to install Python separately.
-
-### 2. Clone and sync
+#### Option 2: Install globally from npm
 
 ```bash
+npm install -g mule2logic-cli
+
+# Now available everywhere:
+mule2logic convert flow.xml --pretty
+```
+
+#### Option 3: Clone and link for development
+
+```bash
+# Clone the repo
 git clone https://github.com/christopherhouse/mule2logic-cli.git
 cd mule2logic-cli
 
-# Install all dependencies (creates .venv automatically)
-uv sync
+# Install dependencies
+npm install
+
+# Build the TypeScript source
+npm run build
+
+# Link the CLI globally
+npm link
+
+# Now available everywhere:
+mule2logic convert flow.xml
 ```
-
-### 3. Set environment variables
-
-```bash
-export FOUNDRY_PROJECT_ENDPOINT="https://your-project.services.ai.azure.com"
-export FOUNDRY_MODEL="gpt-4o"  # optional, defaults to gpt-4o
-```
-
-### 4. Authenticate with Azure
-
-```bash
-az login
-```
-
-### 5. Run it
-
-```bash
-uv run mule2logic convert flow.xml --pretty
-```
-
-That's it — `uv run` ensures the CLI runs inside the project's virtual environment with all dependencies available.
 
 ---
 
 ## 🚀 Usage
 
-All examples below use `uv run` to invoke the CLI from your local clone.  If you installed the package globally (e.g., via `uv tool install mule2logic`), you can drop the `uv run` prefix.
-
 ### Basic conversion
 
 ```bash
-uv run mule2logic convert flow.xml
+mule2logic convert flow.xml
 ```
 
 ### Pipe XML from stdin
 
 ```bash
-cat flow.xml | uv run mule2logic convert
+cat flow.xml | mule2logic convert
 ```
 
 ### Save to a file with pretty-printing
 
 ```bash
-uv run mule2logic convert flow.xml --output workflow.json --pretty
+mule2logic convert flow.xml --output workflow.json --pretty
 ```
 
 ### Get an AI explanation of the conversion
 
 ```bash
-uv run mule2logic convert flow.xml --explain --pretty
+mule2logic convert flow.xml --explain --pretty
 ```
 
 ### Use a different model
 
 ```bash
-uv run mule2logic convert flow.xml --model gpt-4.1
+mule2logic convert flow.xml --model gpt-4.1
 ```
 
 ### Generate a migration analysis report
 
 ```bash
-uv run mule2logic convert flow.xml --output workflow.json --report migration-report.md
+mule2logic convert flow.xml --output workflow.json --report migration-report.md
 ```
 
 ### Skip the QC review agent
 
 ```bash
-uv run mule2logic convert flow.xml --no-review
+mule2logic convert flow.xml --no-review
 ```
 
 ### Increase timeout for large flows
 
 ```bash
-uv run mule2logic convert big-flow.xml --timeout 600
+mule2logic convert big-flow.xml --timeout 600000
 ```
 
 ### 🎛️ All CLI Flags
@@ -243,9 +231,9 @@ uv run mule2logic convert big-flow.xml --timeout 600
 | `--explain` | 💡 Include an AI-generated explanation of the conversion |
 | `--pretty` | 🎨 Pretty-print the JSON output (2-space indent) |
 | `--verbose` | 🔍 Print debug information to stderr |
-| `--debug` | 🐛 Dump raw agent response to stderr |
-| `--model <model>` | 🧠 Foundry model deployment name (default: `gpt-4o`) |
-| `--timeout <seconds>` | ⏱️ Timeout per agent call in seconds (default: `300`) |
+| `--debug` | 🐛 Dump raw Copilot response to stderr |
+| `--model <model>` | 🧠 Model to use (default: `claude-opus-4.6`) |
+| `--timeout <ms>` | ⏱️ Timeout per Copilot call in ms (default: `300000`) |
 | `--no-review` | ⏭️ Skip the QC review agent step |
 
 ---
@@ -262,7 +250,7 @@ uv run mule2logic convert big-flow.xml --timeout 600
 
 **Command:**
 ```bash
-uv run mule2logic convert hello-flow.xml --pretty
+mule2logic convert hello-flow.xml --pretty
 ```
 
 **Output:**
@@ -299,37 +287,23 @@ uv run mule2logic convert hello-flow.xml --pretty
 ## 🏗️ Architecture
 
 ```
-                    ┌──────────────────────┐
-XML Input  →  io.py  →  prompt.py  →  agent.py  →  validate.py  →  review.py  →  report.py  →  Output
- (file          (read)    (build       (Agent        (parse &        (QC review    (migration    (JSON +
-  or stdin)                prompt)      Framework     validate)       agent)        report)      report)
-                                        + MCP)
+                    ┌──────────────┐
+XML Input  →  io.ts  →  prompt.ts  →  copilot.ts  →  validate.ts  →  review.ts  →  report.ts  →  Output
+ (file          (read)    (build        (Copilot SDK    (parse &        (QC review    (migration    (JSON +
+  or stdin)                prompt)       + MCP servers)   validate)       agent)        report)      report)
 ```
 
-The project is split into **two packages** for future separation:
+The CLI follows a pipeline with a **multi-pass AI architecture**:
 
-### `mule2logic_agent` — The Agent (deployable independently)
+1. **📥 Load** — Read MuleSoft XML from a file or stdin (`io.ts`)
+2. **📝 Prompt** — Build structured prompts from markdown templates (`prompt.ts` + `prompts/`)
+3. **🤖 Convert** — Send to GitHub Copilot SDK, grounded via Microsoft Learn MCP (Logic Apps schema) and Context7 MCP (MuleSoft docs) (`copilot.ts`)
+4. **✅ Validate** — Ensure the response is valid Logic Apps JSON with structural checks (`validate.ts`)
+5. **🔍 Review** — A second AI pass validates semantic correctness, checks for dropped elements, and fixes issues (`review.ts`)
+6. **📤 Output** — Write workflow JSON to stdout or a file
+7. **📊 Report** *(optional)* — A third AI pass analyzes the migration and writes a Markdown report to disk (`report.ts`)
 
-The conversion engine. Contains all AI logic, prompt templates, validation, and MCP integration. Designed to be deployed as a container app / API service.
-
-- **`core/agent.py`** — `FoundryChatClient` + `Agent` lifecycle, MCP tool wiring
-- **`core/prompt.py`** — Loads markdown prompt templates, injects XML
-- **`core/validate.py`** — JSON parsing, structural validation
-- **`core/review.py`** — QC review agent pass
-- **`core/report.py`** — Migration report agent pass
-- **`core/io.py`** — File/stdin reader
-- **`service.py`** — High-level `convert()` function (the public API)
-- **`models.py`** — `ConvertRequest` / `ConvertResult` data contracts
-
-### `mule2logic_cli` — The CLI Shell
-
-A thin CLI that calls into the agent package. When the agent is deployed remotely, this package will switch to HTTP calls instead of direct imports.
-
-- **`cli.py`** — argparse entry point
-- **`commands/convert.py`** — Pipeline orchestrator with spinners / colours
-- **`display.py`** — ANSI colour and spinner helpers
-
-> If validation fails on the conversion step, the tool **retries once** automatically.
+> If validation fails on step 4, the tool **retries once** automatically.
 
 For a deep dive, check out the [Architecture doc](docs/architecture.md).
 
@@ -339,46 +313,33 @@ For a deep dive, check out the [Architecture doc](docs/architecture.md).
 
 ```
 mule2logic-cli/
-├── src/
-│   ├── mule2logic_agent/             # Agent package (deployable independently)
-│   │   ├── __init__.py
-│   │   ├── models.py                 # ConvertRequest / ConvertResult contracts
-│   │   ├── service.py                # High-level convert() API
-│   │   ├── core/
-│   │   │   ├── agent.py              # FoundryChatClient + Agent + MCP tools
-│   │   │   ├── prompt.py             # Prompt template loader
-│   │   │   ├── io.py                 # File and stdin reader
-│   │   │   ├── validate.py           # JSON structure validator
-│   │   │   ├── review.py             # QC review agent
-│   │   │   └── report.py             # Migration report generator
-│   │   └── prompts/
-│   │       ├── system.prompt.md      # System prompt (conversion rules)
-│   │       ├── user.prompt.md        # User prompt template
-│   │       ├── review.prompt.md      # Review agent system prompt
-│   │       ├── report.prompt.md      # Report agent system prompt
-│   │       └── report.user.prompt.md # Report user prompt template
-│   └── mule2logic_cli/               # CLI package (thin shell)
-│       ├── __init__.py
-│       ├── cli.py                    # argparse entry point
-│       ├── display.py                # ANSI colours and spinners
-│       └── commands/
-│           └── convert.py            # Convert command orchestrator
-├── tests/
-│   ├── test_validate.py
-│   ├── test_prompt.py
-│   ├── test_io.py
-│   ├── test_agent.py
-│   ├── test_review.py
-│   ├── test_convert.py
-│   └── fixtures/
-│       ├── simple-flow.xml
-│       ├── not-simple-flow.xml
-│       └── even-less-simple-flow.xml
+├── src/                          # TypeScript source
+│   ├── cli.ts                    # CLI entry point (commander)
+│   ├── commands/
+│   │   └── convert.ts            # Conversion pipeline orchestrator
+│   ├── core/
+│   │   ├── copilot.ts            # Copilot SDK + MCP server client
+│   │   ├── prompt.ts             # Prompt template loader
+│   │   ├── io.ts                 # File and stdin reader
+│   │   ├── validate.ts           # JSON structure validator
+│   │   ├── review.ts             # QC review agent
+│   │   └── report.ts             # Migration report generator
+│   └── prompts/
+│       ├── system.prompt.md      # System prompt (conversion rules)
+│       ├── user.prompt.md        # User prompt template
+│       ├── review.prompt.md      # Review agent system prompt
+│       ├── report.prompt.md      # Report agent system prompt
+│       └── report.user.prompt.md # Report user prompt template
+├── dist/                         # Compiled JS output (git-ignored)
+├── test/
+│   ├── *.test.ts                 # Unit tests (Node.js test runner + tsx)
+│   └── fixtures/                 # Test XML fixtures
 ├── docs/
 │   ├── mule2logic-cli-spec-v2.md
 │   ├── architecture.md
 │   └── test-cases.md
-├── pyproject.toml
+├── tsconfig.json                 # TypeScript configuration
+├── package.json
 └── LICENSE
 ```
 
@@ -386,19 +347,21 @@ mule2logic-cli/
 
 ## 🧪 Testing
 
-Tests use **pytest** via **uv**:
+Tests use the **Node.js built-in test runner** with [tsx](https://github.com/privatenumber/tsx) for TypeScript support:
 
 ```bash
-uv sync
-uv run pytest
+npm test
 ```
 
 Test coverage includes:
 
-- ✅ End-to-end conversion pipeline (mocked agent)
+- ✅ End-to-end conversion pipeline
 - ✅ Pretty-print, explain, and output-to-file flags
+- ✅ Verbose logging
 - ✅ Missing file and empty input error handling
-- ✅ Agent Framework client lifecycle and MCP tool setup
+- ✅ Invalid JSON retry logic
+- ✅ Copilot SDK client lifecycle
+- ✅ MCP server configuration
 - ✅ Prompt building and template loading
 - ✅ JSON validation and structural checks
 - ✅ Review agent workflow
@@ -416,8 +379,51 @@ See [test-cases.md](docs/test-cases.md) for full details.
 | 📭 Empty input | Friendly error message → exit code `1` |
 | ❌ Invalid JSON from AI | Retry once automatically |
 | ❌❌ Retry also fails | Error message → exit code `1` |
-| ⏱️ Timeout | Configurable via `--timeout` (default 300s) |
+| ⏱️ Timeout | Configurable via `--timeout` (default 5 min) |
 | 🔍 Review agent fails | Falls back to original conversion output |
+
+---
+
+## 📦 Packaging & Distribution
+
+The project is written in **TypeScript** and compiles to JavaScript in the `dist/` directory. The `package.json` is configured for seamless CLI distribution via npm.
+
+### How it works
+
+| `package.json` field | Purpose |
+|---|---|
+| `"bin": { "mule2logic": "dist/cli.js" }` | Registers the `mule2logic` command when installed globally or via npx |
+| `"files": ["dist/**/*"]` | Only the compiled output is included in the published package |
+| `"prepublishOnly": "npm run build"` | Automatically builds before `npm publish` |
+
+### Using via `npx` (zero install)
+
+Anyone with Node.js 18+ can run the CLI without installing anything:
+
+```bash
+npx mule2logic-cli convert my-flow.xml --pretty
+```
+
+> **Note:** The npm package name is `mule2logic-cli`, but the CLI command it registers is `mule2logic`. With `npx` you use the **package name**, but after a global install you use the **command name**.
+
+### Installing globally
+
+```bash
+npm install -g mule2logic-cli
+mule2logic convert my-flow.xml --pretty
+```
+
+### Publishing to npm (for maintainers)
+
+```bash
+# 1. Bump version
+npm version patch   # or minor / major
+
+# 2. Publish (build runs automatically via prepublishOnly)
+npm publish
+```
+
+After publishing, anyone can `npx mule2logic-cli convert ...` or `npm install -g mule2logic-cli` and have the `mule2logic` command available globally.
 
 ---
 
@@ -431,10 +437,10 @@ Contributions are welcome! Here's how to get started:
    git checkout -b feature/my-awesome-feature
    ```
 3. **Make your changes** and add tests
-4. **Run the tests** to make sure everything passes:
+4. **Build and run the tests** to make sure everything passes:
    ```bash
-   uv sync
-   uv run pytest
+   npm run build
+   npm test
    ```
 5. **Open a Pull Request** 🎉
 

@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { SYSTEM_PROMPT, buildPrompt } from '../src/tsx/core/prompt.js';
+import { SYSTEM_PROMPT, buildPrompt } from '../src/core/prompt.js';
 
 describe('SYSTEM_PROMPT', () => {
   it('is a non-empty string', () => {

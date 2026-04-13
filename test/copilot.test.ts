@@ -36,7 +36,7 @@ mock.module('@github/copilot-sdk', {
   }
 });
 
-const { runCopilot } = await import('../src/tsx/core/copilot.js');
+const { runCopilot } = await import('../src/core/copilot.js');
 
 describe('runCopilot', () => {
   beforeEach(() => {

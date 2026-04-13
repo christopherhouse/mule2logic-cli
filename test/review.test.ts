@@ -38,7 +38,7 @@ mock.module('@github/copilot-sdk', {
   }
 });
 
-const { reviewWorkflow } = await import('../src/tsx/core/review.js');
+const { reviewWorkflow } = await import('../src/core/review.js');
 
 describe('reviewWorkflow', () => {
   beforeEach(() => {
