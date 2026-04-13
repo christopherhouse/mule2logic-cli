@@ -17,6 +17,11 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 WORKDIR /build
 
+# Create the virtual environment at the FINAL runtime path (/app/.venv) so that
+# shebang lines in scripts like uvicorn reference /app/.venv/bin/python — which
+# will be valid after the venv is copied into the runtime stage.
+ENV UV_PROJECT_ENVIRONMENT=/app/.venv
+
 # Mirror the repo layout so the relative path in pyproject.toml
 # (../../packages/contracts) resolves correctly.
 COPY packages/contracts/pyproject.toml packages/contracts/pyproject.toml
@@ -26,13 +31,15 @@ COPY packages/contracts/src/ packages/contracts/src/
 COPY apps/api/pyproject.toml apps/api/pyproject.toml
 
 # Sync dependencies (production only, no dev deps)
-RUN cd apps/api && uv sync --no-dev --no-install-project
+# --no-editable ensures packages are installed into site-packages (not .pth
+# symlinks back to /build/…) so the venv is fully self-contained.
+RUN cd apps/api && uv sync --no-dev --no-editable --no-install-project
 
 # Copy API application source
 COPY apps/api/src/ apps/api/src/
 
 # Install project itself
-RUN cd apps/api && uv sync --no-dev
+RUN cd apps/api && uv sync --no-dev --no-editable
 
 # --- Stage 2: Runtime ---
 FROM python:3.13-slim AS runtime
@@ -42,11 +49,8 @@ RUN groupadd --system app && useradd --system --gid app app
 
 WORKDIR /app
 
-# Copy the virtual environment from the builder
-COPY --from=builder /build/apps/api/.venv /app/.venv
-
-# Copy application source
-COPY --from=builder /build/apps/api/src /app/src
+# Copy the virtual environment from the builder (already at /app/.venv)
+COPY --from=builder /app/.venv /app/.venv
 
 # Ensure the venv is on PATH
 ENV PATH="/app/.venv/bin:$PATH"
