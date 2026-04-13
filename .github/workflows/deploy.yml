@@ -4,6 +4,11 @@
 # Deploys infrastructure (Bicep) and application (Container App) to Azure.
 # Uses OIDC federated identity — no stored secrets for Azure auth.
 #
+# Pipeline:
+#   1. deploy-infra  — Bicep deploys environment, registry, identity, monitoring
+#   2. build-push    — Build container image and push to ACR
+#   3. deploy-app    — Deploy Container App via script (create or update)
+#
 # Triggers:
 #   - Push to main (auto-deploy to dev)
 #   - Manual dispatch with environment selector
@@ -45,7 +50,10 @@ jobs:
     outputs:
       acr-login-server: ${{ steps.deploy.outputs.acrLoginServer }}
       acr-name: ${{ steps.deploy.outputs.acrName }}
-      app-name: ${{ steps.deploy.outputs.apiAppName }}
+      cae-name: ${{ steps.deploy.outputs.containerAppsEnvironmentName }}
+      uami-resource-id: ${{ steps.deploy.outputs.uamiResourceId }}
+      uami-client-id: ${{ steps.deploy.outputs.uamiClientId }}
+      app-insights-conn-string: ${{ steps.deploy.outputs.appInsightsConnectionString }}
       resource-group: ${{ vars.AZURE_RESOURCE_GROUP_NAME }}
     steps:
       - uses: actions/checkout@v4
@@ -105,14 +113,16 @@ jobs:
             .
 
   # -----------------------------------------------------------------------
-  # Job 3: Deploy to Container Apps
+  # Job 3: Deploy Container App via script
   # -----------------------------------------------------------------------
   deploy-app:
-    name: Deploy Container App
+    name: Deploy Container App (${{ github.event.inputs.environment || 'dev' }})
     runs-on: ubuntu-latest
     needs: [deploy-infra, build-push-image]
     environment: ${{ github.event.inputs.environment || 'dev' }}
     steps:
+      - uses: actions/checkout@v4
+
       - name: Azure Login (OIDC)
         uses: azure/login@v2
         with:
@@ -120,9 +130,16 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Update Container App image
+      - name: Deploy Container App
+        env:
+          RESOURCE_GROUP: ${{ needs.deploy-infra.outputs.resource-group }}
+          ENVIRONMENT_NAME: ${{ env.DEPLOY_ENV }}
+          ACR_LOGIN_SERVER: ${{ needs.deploy-infra.outputs.acr-login-server }}
+          IMAGE_TAG: ${{ needs.build-push-image.outputs.image-tag }}
+          UAMI_RESOURCE_ID: ${{ needs.deploy-infra.outputs.uami-resource-id }}
+          UAMI_CLIENT_ID: ${{ needs.deploy-infra.outputs.uami-client-id }}
+          APP_INSIGHTS_CONN_STRING: ${{ needs.deploy-infra.outputs.app-insights-conn-string }}
+          CAE_NAME: ${{ needs.deploy-infra.outputs.cae-name }}
         run: |
-          az containerapp update \
-            --name ${{ needs.deploy-infra.outputs.app-name }} \
-            --resource-group ${{ needs.deploy-infra.outputs.resource-group }} \
-            --image ${{ needs.deploy-infra.outputs.acr-login-server }}/m2la-api:${{ needs.build-push-image.outputs.image-tag }}
+          chmod +x infra/scripts/deploy-container-app.sh
+          ./infra/scripts/deploy-container-app.sh

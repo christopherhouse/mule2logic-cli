@@ -14,7 +14,7 @@ infra/bicep/
     ├── identity.bicep           # User Assigned Managed Identity
     ├── monitoring.bicep         # Log Analytics + Application Insights
     ├── registry.bicep           # Azure Container Registry
-    ├── container-apps.bicep     # Container Apps Environment + API App
+    ├── container-apps.bicep     # Container Apps Environment (env only)
     └── ai-foundry.bicep         # AI Foundry account + project + model deployments (raw Bicep)
 ```
 
@@ -27,7 +27,7 @@ infra/bicep/
 | Application Insights | AVM `avm.res.insights.component` | APM and telemetry |
 | ACR | AVM `avm.res.container-registry.registry` | Container image storage |
 | Container Apps Env | AVM `avm.res.app.managed-environment` | Hosting environment |
-| Container App | AVM `avm.res.app.container-app` | Backend API service |
+| Container App | Script `infra/scripts/deploy-container-app.sh` | Backend API service (deployed after image push) |
 | AI Foundry | Raw Bicep (`Microsoft.CognitiveServices`) | LLM model access for agents |
 
 > **Note:** AI Foundry uses raw Bicep instead of AVM. The AVM pattern module
@@ -61,7 +61,6 @@ az deployment group create \
 | `environmentName` | `dev` \| `test` \| `prod` | Controls naming and SKU defaults |
 | `location` | string | Azure region (defaults to RG location) |
 | `acrSkuName` | `Basic` \| `Standard` \| `Premium` | ACR tier |
-| `containerImage` | string | Full image ref (empty = placeholder) |
 | `aiModelDeployments` | array | OpenAI model deployments |
 
 See [docs/deployment.md](../../docs/deployment.md) for full deployment guide including CI/CD setup.
