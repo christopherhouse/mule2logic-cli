@@ -1,5 +1,6 @@
 /**
  * CLI service layer.
- * Services for communicating with the backend API.
  */
-export {};
+export { detectInputMode } from "./input-detector.js";
+export { validateProjectMode, validateSingleFlowMode } from "./input-validator.js";
+export { ApiClient } from "./api-client.js";

@@ -1,5 +1,6 @@
 /**
  * CLI command definitions.
- * Commands will be registered here as they are implemented.
  */
-export {};
+export { createAnalyzeCommand } from "./analyze.js";
+export { createTransformCommand } from "./transform.js";
+export { createValidateCommand } from "./validate.js";
