@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+        http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+
+    <!-- This flow references an external config-ref that doesn't exist in this file -->
+    <flow name="standaloneApiFlow">
+        <http:listener config-ref="External_HTTP_Config" path="/api/data"/>
+        <set-variable variableName="apiKey" value="${api.key}"/>
+        <ee:transform>
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    data: payload,
+    key: vars.apiKey
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <flow-ref name="externalProcessingFlow"/>
+        <http:request method="GET" url="${backend.url}/items" config-ref="External_Request_Config"/>
+        <error-handler>
+            <on-error-propagate type="HTTP:CONNECTIVITY">
+                <set-payload value="Connection failed"/>
+            </on-error-propagate>
+        </error-handler>
+    </flow>
+
+    <sub-flow name="localHelper">
+        <set-variable variableName="processed" value="true"/>
+        <set-payload value="Processed locally"/>
+    </sub-flow>
+
+</mule>
