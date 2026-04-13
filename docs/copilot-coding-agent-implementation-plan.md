@@ -190,7 +190,16 @@ Expand supported constructs, improve validation, repair suggestions, test covera
 
 ---
 
-## PR-000 — GitHub Copilot / Coding Agent Artifacts
+## PR-000 — GitHub Copilot / Coding Agent Artifacts ✅ COMPLETE
+
+**Completed: 2025-04-13**
+
+Delivered all required and optional artifacts:
+- `.github/copilot-instructions.md` — project-wide instructions covering all tech stack rules, identity, testing, observability, and PR workflow conventions.
+- `.github/agents/` — 5 custom agents: `bicep-infra`, `python-backend`, `typescript-cli`, `foundry-agent`, `qa`.
+- `.github/skills/` — 3 domain skills: `logic-apps-standard` (project structure/schema), `mulesoft-project` (Mule XML conventions), `connector-mapping` (resolution logic/priority rules).
+- Skipped IR schema skill (would be an empty placeholder until IR is designed in PR-006).
+- All formats validated against VS Code Copilot customization documentation.
 
 ### Goal
 Establish GitHub Copilot customization artifacts that ensure every subsequent PR benefits from project-aware AI assistance with enforced quality standards and best practices.
