@@ -46,7 +46,15 @@ module containerEnv 'br/public:avm/res/app/managed-environment:0.8.1' = {
     location: location
     tags: tags
     logAnalyticsWorkspaceResourceId: logAnalyticsWorkspaceResourceId
+    appInsightsConnectionString: appInsightsConnectionString
     zoneRedundant: false
+    // Enable workload profiles mode with Consumption profile
+    workloadProfiles: [
+      {
+        name: 'Consumption'
+        workloadProfileType: 'Consumption'
+      }
+    ]
   }
 }
 
@@ -96,7 +104,7 @@ module apiApp 'br/public:avm/res/app/container-app:0.12.0' = {
       }
     ]
     ingressExternal: true
-    ingressTargetPort: 8000
+    ingressTargetPort: !empty(containerImage) ? 8000 : 80
     ingressTransport: 'auto'
     scaleMinReplicas: 0
     scaleMaxReplicas: 10

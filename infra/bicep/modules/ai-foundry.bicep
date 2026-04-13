@@ -15,6 +15,9 @@ param tags object = {}
 @description('Principal ID of the UAMI to grant Cognitive Services OpenAI User role.')
 param uamiPrincipalId string
 
+@description('Resource ID of the Log Analytics workspace for diagnostic settings.')
+param logAnalyticsWorkspaceResourceId string
+
 @description('OpenAI model deployments to provision.')
 param aiModelDeployments array = [
   {
@@ -54,6 +57,19 @@ module aiServices 'br/public:avm/res/cognitive-services/account:0.14.2' = {
     publicNetworkAccess: 'Enabled'
     allowProjectManagement: true // Required for AI Foundry project creation
     deployments: aiModelDeployments
+    // Send all logs and metrics to Log Analytics
+    diagnosticSettings: [
+      {
+        name: 'allLogsAndMetrics'
+        logCategoriesAndGroups: [
+          { categoryGroup: 'allLogs' }
+        ]
+        metricCategories: [
+          { category: 'AllMetrics' }
+        ]
+        workspaceResourceId: logAnalyticsWorkspaceResourceId
+      }
+    ]
     roleAssignments: [
       {
         principalId: uamiPrincipalId

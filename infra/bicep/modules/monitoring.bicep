@@ -28,6 +28,19 @@ module logAnalytics 'br/public:avm/res/operational-insights/workspace:0.9.1' = {
     tags: tags
     skuName: 'PerGB2018'
     dataRetention: 30
+    // Send workspace logs/metrics to itself
+    diagnosticSettings: [
+      {
+        name: 'allLogsAndMetrics'
+        logCategoriesAndGroups: [
+          { categoryGroup: 'allLogs' }
+        ]
+        metricCategories: [
+          { category: 'AllMetrics' }
+        ]
+        useThisWorkspace: true
+      }
+    ]
   }
 }
 
@@ -43,6 +56,19 @@ module appInsights 'br/public:avm/res/insights/component:0.4.2' = {
     workspaceResourceId: logAnalytics.outputs.resourceId
     kind: 'web'
     applicationType: 'web'
+    // Send all logs and metrics to the Log Analytics workspace
+    diagnosticSettings: [
+      {
+        name: 'allLogsAndMetrics'
+        logCategoriesAndGroups: [
+          { categoryGroup: 'allLogs' }
+        ]
+        metricCategories: [
+          { category: 'AllMetrics' }
+        ]
+        workspaceResourceId: logAnalytics.outputs.resourceId
+      }
+    ]
   }
 }
 

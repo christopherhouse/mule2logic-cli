@@ -18,6 +18,9 @@ param uamiPrincipalId string
 @allowed(['Basic', 'Standard', 'Premium'])
 param skuName string = 'Basic'
 
+@description('Resource ID of the Log Analytics workspace for diagnostic settings.')
+param logAnalyticsWorkspaceResourceId string
+
 // ---------------------------------------------------------------------------
 // Naming — ACR names must be globally unique, alphanumeric only
 // ---------------------------------------------------------------------------
@@ -33,6 +36,19 @@ module acr 'br/public:avm/res/container-registry/registry:0.6.0' = {
     location: location
     tags: tags
     acrSku: skuName
+    // Send all logs and metrics to Log Analytics
+    diagnosticSettings: [
+      {
+        name: 'allLogsAndMetrics'
+        logCategoriesAndGroups: [
+          { categoryGroup: 'allLogs' }
+        ]
+        metricCategories: [
+          { category: 'AllMetrics' }
+        ]
+        workspaceResourceId: logAnalyticsWorkspaceResourceId
+      }
+    ]
     // Grant UAMI the AcrPull role for Container Apps image pulling
     roleAssignments: [
       {
