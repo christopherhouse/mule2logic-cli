@@ -127,13 +127,13 @@ repo-root/
 - Framework: **FastAPI**
 - Package/env management: **uv** exclusively (no pip, poetry, conda)
 - Responsibilities:
-  - accept Mule project input
-  - analyze Mule project
+  - accept Mule project **or** single flow XML input (dual-mode)
+  - analyze Mule project or individual flow
   - build IR
   - run transformation pipeline
   - run validation
   - optionally invoke agent orchestration
-  - produce Logic Apps Standard output artifacts
+  - produce Logic Apps Standard output artifacts (full project or standalone workflow JSON)
   - expose telemetry
 
 ## CLI
@@ -145,8 +145,9 @@ repo-root/
   - progress states
   - readable failures
 - Responsibilities:
-  - validate local project path
-  - package and submit project to backend
+  - validate local project path **or** single flow XML file path
+  - auto-detect input mode (directory → project, .xml file → single-flow)
+  - package and submit project or flow to backend
   - display analysis/progress/results
   - write output locally if applicable
   - preserve trace context if possible
@@ -189,7 +190,16 @@ Expand supported constructs, improve validation, repair suggestions, test covera
 
 ---
 
-## PR-000 — GitHub Copilot / Coding Agent Artifacts
+## PR-000 — GitHub Copilot / Coding Agent Artifacts ✅ COMPLETE
+
+**Completed: 2025-04-13**
+
+Delivered all required and optional artifacts:
+- `.github/copilot-instructions.md` — project-wide instructions covering all tech stack rules, identity, testing, observability, and PR workflow conventions.
+- `.github/agents/` — 5 custom agents: `bicep-infra`, `python-backend`, `typescript-cli`, `foundry-agent`, `qa`.
+- `.github/skills/` — 3 domain skills: `logic-apps-standard` (project structure/schema), `mulesoft-project` (Mule XML conventions), `connector-mapping` (resolution logic/priority rules).
+- Skipped IR schema skill (would be an empty placeholder until IR is designed in PR-006).
+- All formats validated against VS Code Copilot customization documentation.
 
 ### Goal
 Establish GitHub Copilot customization artifacts that ensure every subsequent PR benefits from project-aware AI assistance with enforced quality standards and best practices.
@@ -347,13 +357,14 @@ Define DTOs and schemas for analysis, transformation, validation, and output pac
 ### Scope
 - create request/response contracts
 - JSON schemas for:
-  - analyze request
+  - analyze request (must support both project mode and single-flow mode)
   - analyze result
-  - transform request
+  - transform request (must support both project mode and single-flow mode)
   - transform result
   - validation report
   - migration gap
 - define severity levels
+- include an input mode discriminator (project vs. single-flow) in request schemas
 
 ### Acceptance Criteria
 - backend and CLI can import shared contract definitions or generated schemas
@@ -376,6 +387,13 @@ Create shared contracts for the platform:
 
 Requirements:
 - Use a clean schema-first or DTO-first pattern that works well across Python backend and TypeScript CLI.
+- Request schemas must support two input modes:
+  - **Project mode**: full MuleSoft project root (directory path, contains pom.xml + flows)
+  - **Single-flow mode**: individual Mule flow XML file path
+  - Include a mode discriminator field and/or auto-detect logic based on input path
+- Response schemas must accommodate both modes:
+  - Project mode: multi-flow analysis, full project artifact manifest
+  - Single-flow mode: single workflow result, warnings about missing external context
 - Include fields for:
   - trace IDs / correlation IDs
   - warnings and gaps
@@ -396,11 +414,12 @@ Stand up FastAPI routes and application configuration.
 
 ### Scope
 - `/health`
-- `/analyze`
-- `/transform`
+- `/analyze` (accepts project path or single flow XML)
+- `/transform` (accepts project path or single flow XML)
 - `/validate`
 - configuration system
 - structured error model
+- auto-detect input mode from path (directory → project, .xml file → single-flow)
 
 ### Acceptance Criteria
 - API starts
@@ -424,6 +443,10 @@ Requirements:
   - POST /analyze
   - POST /transform
   - POST /validate
+- Routes that accept input (analyze, transform) must support **both** input modes:
+  - **Project mode**: path to a MuleSoft project root directory
+  - **Single-flow mode**: path to a single Mule flow XML file
+  - Auto-detect mode from the input path (directory vs. .xml file), or accept an explicit mode parameter
 - Use shared request/response contracts.
 - Add clean config loading.
 - Add structured error responses.
@@ -443,10 +466,11 @@ Build a polished TypeScript CLI shell.
 
 ### Scope
 - commands:
-  - `analyze`
-  - `transform`
+  - `analyze` (project path or single flow XML file)
+  - `transform` (project path or single flow XML file)
   - `validate`
-- path validation
+- auto-detect input mode (directory → project mode, .xml file → single-flow mode)
+- path validation appropriate to each mode
 - colorful output
 - emoji/icons
 - progress spinners or status display
@@ -455,7 +479,9 @@ Build a polished TypeScript CLI shell.
 ### Acceptance Criteria
 - CLI help works
 - command structure is intuitive
-- validates that input path is a Mule project root
+- project mode: validates that input path is a Mule project root
+- single-flow mode: validates that input path is a .xml file containing Mule flow elements
+- CLI clearly indicates which mode is active
 
 ### Prompt for Copilot Coding Agent
 ```text
@@ -469,17 +495,22 @@ Build a polished TypeScript CLI for the migration platform.
 Requirements:
 - Use latest GA TypeScript
 - Add commands:
-  - analyze <projectPath>
-  - transform <projectPath>
+  - analyze <inputPath>
+  - transform <inputPath>
   - validate <outputPath>
+- `inputPath` can be either a MuleSoft project root directory or a single Mule flow XML file.
+- The CLI must auto-detect input mode:
+  - directory → project mode
+  - .xml file → single-flow mode
 - The CLI must feel engaging:
   - use chalk for colors
   - use emoji/icons
   - show progress states
   - use clear section headers and readable status summaries
-- Validate that analyze/transform input is a valid MuleSoft/Anypoint project root:
-  - must include pom.xml
-  - must include Mule config locations typical of a Mule project
+- Validate input based on detected mode:
+  - **Project mode**: must include pom.xml and Mule config locations typical of a Mule project
+  - **Single-flow mode**: must be a valid XML file containing at least one `<flow>` or `<sub-flow>` element
+- Clearly indicate which mode is active in CLI output
 - Add configuration for backend endpoint
 - Return friendly errors
 
@@ -491,18 +522,26 @@ Do not make the CLI depend on transformation logic yet beyond calling placeholde
 ## PR-005 — Mule Project Discovery and Parsing
 
 ### Goal
-Parse a valid Mule project rather than ad hoc flow files.
+Parse a valid Mule project **or** a single Mule flow XML file.
 
 ### Scope
-- identify project root
-- parse `pom.xml`
-- discover flow XML files
-- discover config files
-- build a normalized project inventory
+- **Project mode:**
+  - identify project root
+  - parse `pom.xml`
+  - discover flow XML files
+  - discover config files
+  - build a normalized project inventory
+- **Single-flow mode:**
+  - parse a standalone Mule XML file
+  - extract flows/subflows from the file
+  - emit warnings for unresolvable external references (connector configs, properties, global elements)
+  - produce a minimal inventory (single file, no project metadata)
 
 ### Acceptance Criteria
-- analyzer can produce a project inventory from sample projects
-- inventory includes flows, subflows, configs, connectors, properties files, key metadata
+- project mode: analyzer can produce a project inventory from sample projects
+- project mode: inventory includes flows, subflows, configs, connectors, properties files, key metadata
+- single-flow mode: analyzer can parse a standalone flow XML and extract flows/subflows
+- single-flow mode: missing external references produce structured warnings, not failures
 
 ### Prompt for Copilot Coding Agent
 ```text
@@ -514,6 +553,9 @@ Implement PR-005.
 Build MuleSoft/Anypoint project discovery and parsing.
 
 Requirements:
+- Support two input modes:
+
+**Project mode** (input is a directory):
 - Input is a Mule project root, not an arbitrary folder of flows.
 - Parse:
   - pom.xml
@@ -529,8 +571,14 @@ Requirements:
   - property files
 - Handle malformed files gracefully and emit structured warnings.
 
-Add representative tests using sample Mule projects.
-Do not yet convert to Logic Apps.
+**Single-flow mode** (input is a .xml file):
+- Parse the standalone Mule XML file.
+- Extract all `<flow>` and `<sub-flow>` elements.
+- Build a minimal inventory with no project metadata (no pom.xml, no config discovery).
+- Emit structured warnings for any unresolvable external references (connector configs, property placeholders, global elements defined outside the file).
+- Do not fail on missing external context — degrade gracefully.
+
+Add representative tests for both modes using sample Mule projects and standalone flow XML files.
 ```
 
 ---
@@ -558,8 +606,10 @@ Create a canonical, deterministic Mule IR.
 
 ### Acceptance Criteria
 - a parsed Mule project can be converted to IR v1
+- a single parsed flow XML can be converted to IR v1 (with warnings for missing context)
 - IR can be serialized to JSON
 - IR tests cover at least 3 sample flows with branching and transforms
+- IR tests include at least 1 single-flow-mode case
 
 ### Prompt for Copilot Coding Agent
 ```text
@@ -589,8 +639,10 @@ Requirements:
   - HTTP listener + transform + outbound call
   - scheduler + loop
   - choice router + error handling
+  - standalone single-flow XML (no project context)
 
 The IR must be practical and extensible, not academic.
+The IR must work for both project mode (full inventory) and single-flow mode (partial inventory with warnings).
 ```
 
 ---
@@ -724,7 +776,8 @@ Implement actual conversion for a solid MVP set.
 - Basic error handling via scopes/runAfter
 
 ### Acceptance Criteria
-- conversion works for representative sample projects
+- conversion works for representative sample projects (project mode)
+- conversion works for standalone flow XML files (single-flow mode)
 - unsupported constructs create explicit migration gaps, not silent drops
 
 ### Prompt for Copilot Coding Agent
@@ -757,6 +810,7 @@ Requirements:
 - Prefer maintainable Logic Apps structures that preserve semantics.
 
 Add golden tests using sample Mule projects and compare generated artifacts against approved outputs where practical.
+Include at least one golden test for single-flow mode (standalone XML → standalone workflow JSON).
 ```
 
 ---
@@ -767,16 +821,18 @@ Add golden tests using sample Mule projects and compare generated artifacts agai
 Add deterministic validation before and after generation.
 
 ### Scope
-- validate Mule project input completeness
+- validate Mule project input completeness (project mode)
+- validate single-flow XML input (single-flow mode)
 - validate IR consistency
 - validate generated Logic Apps artifact integrity
 - validate:
   - action reference integrity
   - runAfter references
   - variable usage
-  - presence of expected files
+  - presence of expected files (project mode only)
   - parameter placeholder completeness
   - identity/auth strategy warnings
+  - unresolvable external references in single-flow mode (emit warnings, not failures)
 
 ### Acceptance Criteria
 - validator produces structured report
@@ -794,9 +850,11 @@ Build the validation engine v1.
 
 Requirements:
 - Validate:
-  - Mule project completeness
+  - Mule project completeness (project mode)
+  - Single-flow XML validity (single-flow mode)
   - IR integrity
-  - generated Logic Apps project integrity
+  - generated Logic Apps project integrity (project mode)
+  - generated standalone workflow JSON integrity (single-flow mode)
 - Checks should include:
   - missing references
   - invalid runAfter references
@@ -805,8 +863,9 @@ Requirements:
   - missing placeholder env vars
   - use of a managed/API connector when a built-in or identity-based option should have been preferred
 - Emit structured validation reports with severity levels and remediation hints.
+- In single-flow mode, unresolvable external references (connector configs, properties) should produce warnings, not hard failures.
 
-Add tests for both passing and failing cases.
+Add tests for both passing and failing cases in both project mode and single-flow mode.
 ```
 
 ---
