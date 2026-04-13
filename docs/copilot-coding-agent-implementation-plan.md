@@ -281,7 +281,21 @@ Keep instructions concise and actionable — avoid walls of text.
 
 ---
 
-## PR-001 — Monorepo Scaffolding
+## PR-001 — Monorepo Scaffolding ✅ COMPLETE
+
+**Completed: 2026-04-13**
+
+Delivered all scaffolding:
+- Monorepo directory structure matching spec §3 layout
+- Python 3.13 FastAPI backend (`apps/api`) with uv, ruff, pytest — health endpoint with test
+- TypeScript CLI (`apps/cli`) with chalk/emoji banner, ESLint, Prettier, vitest — 3 passing tests
+- Placeholder packages: contracts, mapping-config, sample-projects
+- Placeholder services: parser, ir, transform, validate, agents
+- Placeholder infra/bicep
+- Placeholder docs: architecture, adrs, runbooks
+- Root README with full local dev instructions (uv-based setup)
+- .gitignore covering Python, Node.js, TypeScript, IDE, and OS artifacts
+- No deviations from scope. API binds to configurable host/port via env vars (M2LA_HOST, M2LA_PORT).
 
 ### Goal
 Create the repository structure and baseline toolchain for Python backend and TypeScript CLI.
