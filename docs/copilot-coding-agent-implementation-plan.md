@@ -363,7 +363,18 @@ Output:
 
 ---
 
-## PR-002 — Azure Infrastructure & CI/CD
+## PR-002 — Azure Infrastructure & CI/CD ✅ COMPLETE
+
+**Completed: 2026-04-13**
+
+Delivered all infrastructure and CI/CD artifacts:
+- **Bicep (AVM)**: 10 modules — Log Analytics, App Insights, UAMI, ACR, Container Apps Env + App, AI Services, AI Foundry hub + project, GPT-4o model deployment, role assignments (AcrPull + Cognitive Services OpenAI User). All major resources use AVM; raw Bicep only for role assignments and model deployments.
+- **Parameter files**: dev.bicepparam, test.bicepparam, prod.bicepparam with meaningful env differences (ACR SKU, retention, replicas, TPM).
+- **GitHub Actions**: PR validation (Python lint/test/build, TypeScript lint/test/build, Bicep lint/validate/what-if) and Deploy (Bicep deploy, Docker build+push to ACR, Container App update, CLI artifact build).
+- **OIDC**: No stored secrets. Federated identity for Azure auth. Bicep validation on PRs is optional when OIDC isn't configured.
+- **Dockerfile**: Multi-stage build with uv, non-root user, health check.
+- **Deployment docs**: Full runbook covering OIDC setup, GitHub environments, manual and automated deployment, troubleshooting.
+- No deviations from scope. Optional resources (Key Vault, Storage) deferred as not yet needed.
 
 ### Goal
 Stand up production-ready Azure infrastructure and CI/CD pipelines immediately after scaffolding, so every subsequent PR can be validated, built, and deployed automatically. Infra and CI/CD land early and evolve incrementally as features are added.

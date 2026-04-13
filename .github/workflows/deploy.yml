@@ -154,9 +154,9 @@ jobs:
         uses: azure/CLI@v2
         with:
           inlineScript: |
-            # Get the SHA-based image tag
-            SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
-            IMAGE="${{ needs.infra.outputs.acr-login-server }}/m2la-api:sha-${SHORT_SHA}"
+            # Build image reference matching docker/metadata-action sha tag format
+            SHA_TAG="sha-$(echo "${{ github.sha }}" | cut -c1-7)"
+            IMAGE="${{ needs.infra.outputs.acr-login-server }}/m2la-api:${SHA_TAG}"
 
             az containerapp update \
               --name "${{ needs.infra.outputs.container-app-name }}" \
