@@ -1,0 +1,93 @@
+{
+  "mode": "project",
+  "project_name": "order-api",
+  "flows": [
+    {
+      "flow_name": "order-process-flow",
+      "source_file": "src/main/mule/order-process.xml",
+      "constructs": {
+        "supported": 5,
+        "unsupported": 1,
+        "partial": 1,
+        "details": {
+          "http_listener": 1,
+          "set_payload": 1,
+          "logger": 2,
+          "choice": 1,
+          "scatter_gather": 1,
+          "dataweave": 1
+        }
+      },
+      "gaps": [
+        {
+          "construct_name": "scatter-gather",
+          "source_location": "src/main/mule/order-process.xml:42",
+          "category": "unsupported_construct",
+          "severity": "error",
+          "message": "Scatter-Gather router has no direct Logic Apps equivalent",
+          "suggested_workaround": "Use parallel branches in Logic Apps workflow"
+        }
+      ],
+      "warnings": [
+        {
+          "code": "PARTIAL_DATAWEAVE",
+          "message": "DataWeave transformation may require manual review",
+          "severity": "warning",
+          "source_location": "src/main/mule/order-process.xml:58"
+        }
+      ]
+    },
+    {
+      "flow_name": "error-handler-flow",
+      "source_file": "src/main/mule/error-handler.xml",
+      "constructs": {
+        "supported": 2,
+        "unsupported": 0,
+        "partial": 0,
+        "details": {
+          "on_error_propagate": 1,
+          "logger": 1
+        }
+      },
+      "gaps": [],
+      "warnings": []
+    }
+  ],
+  "overall_constructs": {
+    "supported": 7,
+    "unsupported": 1,
+    "partial": 1,
+    "details": {
+      "http_listener": 1,
+      "set_payload": 1,
+      "logger": 3,
+      "choice": 1,
+      "scatter_gather": 1,
+      "dataweave": 1,
+      "on_error_propagate": 1
+    }
+  },
+  "gaps": [
+    {
+      "construct_name": "scatter-gather",
+      "source_location": "src/main/mule/order-process.xml:42",
+      "category": "unsupported_construct",
+      "severity": "error",
+      "message": "Scatter-Gather router has no direct Logic Apps equivalent",
+      "suggested_workaround": "Use parallel branches in Logic Apps workflow"
+    }
+  ],
+  "warnings": [
+    {
+      "code": "PARTIAL_DATAWEAVE",
+      "message": "DataWeave transformation may require manual review",
+      "severity": "warning",
+      "source_location": "src/main/mule/order-process.xml:58"
+    }
+  ],
+  "telemetry": {
+    "trace_id": "abc123def456",
+    "span_id": "span003",
+    "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
+  }
+}

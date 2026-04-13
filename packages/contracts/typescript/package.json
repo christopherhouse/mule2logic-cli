@@ -1,0 +1,17 @@
+{
+  "name": "@m2la/contracts",
+  "version": "0.1.0",
+  "description": "TypeScript type definitions for MuleSoft to Logic Apps migration contracts",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.4"
+  }
+}

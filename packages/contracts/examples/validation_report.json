@@ -1,0 +1,25 @@
+{
+  "valid": false,
+  "issues": [
+    {
+      "rule_id": "SCHEMA_001",
+      "message": "workflow.json is missing required 'definition' property",
+      "severity": "error",
+      "artifact_path": "order-process-flow/workflow.json",
+      "location": "$.definition"
+    },
+    {
+      "rule_id": "CONN_002",
+      "message": "Connection reference 'sql-connection' not found in connections.json",
+      "severity": "warning",
+      "artifact_path": "order-process-flow/workflow.json",
+      "location": "$.definition.actions.Query_Database"
+    }
+  ],
+  "artifacts_validated": 4,
+  "telemetry": {
+    "trace_id": "abc123def456",
+    "span_id": "span008",
+    "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
+  }
+}

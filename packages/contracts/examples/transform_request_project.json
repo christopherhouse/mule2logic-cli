@@ -1,0 +1,10 @@
+{
+  "input_path": "/home/user/mulesoft-projects/order-api",
+  "mode": "project",
+  "output_directory": "./output/order-api",
+  "telemetry": {
+    "trace_id": "abc123def456",
+    "span_id": "span005",
+    "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
+  }
+}
