@@ -1,0 +1,300 @@
+{
+  "$defs": {
+    "ConstructCount": {
+      "description": "Summary counts of supported, unsupported, and partially supported constructs.",
+      "properties": {
+        "supported": {
+          "default": 0,
+          "description": "Number of fully supported constructs",
+          "minimum": 0,
+          "title": "Supported",
+          "type": "integer"
+        },
+        "unsupported": {
+          "default": 0,
+          "description": "Number of unsupported constructs",
+          "minimum": 0,
+          "title": "Unsupported",
+          "type": "integer"
+        },
+        "partial": {
+          "default": 0,
+          "description": "Number of partially supported constructs",
+          "minimum": 0,
+          "title": "Partial",
+          "type": "integer"
+        },
+        "details": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "description": "Per-construct-type counts (e.g., {'http_listener': 2})",
+          "title": "Details",
+          "type": "object"
+        }
+      },
+      "title": "ConstructCount",
+      "type": "object"
+    },
+    "FlowAnalysis": {
+      "description": "Analysis result for a single Mule flow.",
+      "properties": {
+        "flow_name": {
+          "description": "Name of the Mule flow",
+          "title": "Flow Name",
+          "type": "string"
+        },
+        "source_file": {
+          "description": "Source XML file containing the flow",
+          "title": "Source File",
+          "type": "string"
+        },
+        "constructs": {
+          "$ref": "#/$defs/ConstructCount",
+          "description": "Construct counts for this flow"
+        },
+        "gaps": {
+          "description": "Migration gaps found in this flow",
+          "items": {
+            "$ref": "#/$defs/MigrationGap"
+          },
+          "title": "Gaps",
+          "type": "array"
+        },
+        "warnings": {
+          "description": "Warnings for this flow",
+          "items": {
+            "$ref": "#/$defs/Warning"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "flow_name",
+        "source_file"
+      ],
+      "title": "FlowAnalysis",
+      "type": "object"
+    },
+    "GapCategory": {
+      "description": "Categories for migration gaps.",
+      "enum": [
+        "unsupported_construct",
+        "unresolvable_reference",
+        "partial_support",
+        "connector_mismatch",
+        "dataweave_complexity"
+      ],
+      "title": "GapCategory",
+      "type": "string"
+    },
+    "InputMode": {
+      "description": "Discriminator for project vs single-flow input mode.",
+      "enum": [
+        "project",
+        "single_flow"
+      ],
+      "title": "InputMode",
+      "type": "string"
+    },
+    "MigrationGap": {
+      "description": "A construct or reference that cannot be fully migrated.",
+      "properties": {
+        "construct_name": {
+          "description": "Name of the MuleSoft construct",
+          "title": "Construct Name",
+          "type": "string"
+        },
+        "source_location": {
+          "description": "Source file and line (e.g., 'flows/main.xml:42')",
+          "title": "Source Location",
+          "type": "string"
+        },
+        "category": {
+          "$ref": "#/$defs/GapCategory",
+          "description": "Classification of the gap"
+        },
+        "severity": {
+          "$ref": "#/$defs/Severity",
+          "description": "Impact severity"
+        },
+        "message": {
+          "description": "Human-readable description of the gap",
+          "title": "Message",
+          "type": "string"
+        },
+        "suggested_workaround": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional workaround suggestion",
+          "title": "Suggested Workaround"
+        }
+      },
+      "required": [
+        "construct_name",
+        "source_location",
+        "category",
+        "severity",
+        "message"
+      ],
+      "title": "MigrationGap",
+      "type": "object"
+    },
+    "Severity": {
+      "description": "Severity levels for warnings, gaps, and validation issues.",
+      "enum": [
+        "info",
+        "warning",
+        "error",
+        "critical"
+      ],
+      "title": "Severity",
+      "type": "string"
+    },
+    "TelemetryContext": {
+      "description": "Telemetry correlation metadata propagated across CLI, API, and services.",
+      "properties": {
+        "trace_id": {
+          "description": "OpenTelemetry trace ID",
+          "title": "Trace Id",
+          "type": "string"
+        },
+        "span_id": {
+          "description": "OpenTelemetry span ID",
+          "title": "Span Id",
+          "type": "string"
+        },
+        "correlation_id": {
+          "description": "Platform correlation ID (UUID)",
+          "title": "Correlation Id",
+          "type": "string"
+        },
+        "parent_span_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Parent span ID for nested operations",
+          "title": "Parent Span Id"
+        }
+      },
+      "required": [
+        "trace_id",
+        "span_id",
+        "correlation_id"
+      ],
+      "title": "TelemetryContext",
+      "type": "object"
+    },
+    "Warning": {
+      "description": "A warning emitted during analysis or transformation.",
+      "properties": {
+        "code": {
+          "description": "Machine-readable warning code (e.g., 'MISSING_CONNECTOR_CONFIG')",
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "description": "Human-readable warning message",
+          "title": "Message",
+          "type": "string"
+        },
+        "severity": {
+          "$ref": "#/$defs/Severity",
+          "default": "warning",
+          "description": "Warning severity"
+        },
+        "source_location": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional source file and line reference",
+          "title": "Source Location"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "Warning",
+      "type": "object"
+    }
+  },
+  "description": "Response from analyzing a MuleSoft project or single flow.",
+  "properties": {
+    "mode": {
+      "$ref": "#/$defs/InputMode",
+      "description": "Input mode used for analysis"
+    },
+    "project_name": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Project name (from pom.xml in project mode, None in single-flow mode)",
+      "title": "Project Name"
+    },
+    "flows": {
+      "description": "Per-flow analysis results",
+      "items": {
+        "$ref": "#/$defs/FlowAnalysis"
+      },
+      "title": "Flows",
+      "type": "array"
+    },
+    "overall_constructs": {
+      "$ref": "#/$defs/ConstructCount",
+      "description": "Aggregate construct counts across all flows"
+    },
+    "gaps": {
+      "description": "All migration gaps found",
+      "items": {
+        "$ref": "#/$defs/MigrationGap"
+      },
+      "title": "Gaps",
+      "type": "array"
+    },
+    "warnings": {
+      "description": "All warnings emitted",
+      "items": {
+        "$ref": "#/$defs/Warning"
+      },
+      "title": "Warnings",
+      "type": "array"
+    },
+    "telemetry": {
+      "$ref": "#/$defs/TelemetryContext",
+      "description": "Telemetry context for trace correlation"
+    }
+  },
+  "required": [
+    "mode",
+    "telemetry"
+  ],
+  "title": "AnalyzeResponse",
+  "type": "object"
+}
