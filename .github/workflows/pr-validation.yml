@@ -86,9 +86,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Bicep CLI
-        uses: azure/setup-bicep@v0.3.0
-
       - name: Build / validate Bicep
         run: az bicep build --file infra/bicep/main.bicep
 
