@@ -1270,7 +1270,7 @@ This PR makes the platform actually work end-to-end, with agents doing the heavy
 
 ---
 
-## PR-013 — MCP Tool Integration Abstractions
+## PR-013 — MCP Tool Integration Abstractions ✅ COMPLETE
 
 ### Goal
 Prepare tool interfaces for grounding and future capability expansion.
@@ -1286,6 +1286,14 @@ Prepare tool interfaces for grounding and future capability expansion.
 ### Acceptance Criteria
 - backend can call through abstractions even with mocked providers
 - orchestration layer can consume provider outputs
+
+### Completion Notes (2026-04-14)
+- **Implementation**: Real HTTP-based grounding providers using Microsoft Learn API (`learn.microsoft.com/api/search`) and Context7 API (`context7.com/api/v2`) — both free, no keys required.
+- **Grounding package**: `services/agents/src/m2la_agents/grounding/` with models, error types, HTTP clients, and MAF-compatible tool functions.
+- **Agent wiring**: PlannerAgent, TransformerAgent, and RepairAdvisorAgent now have grounding tools (`search_logic_apps_docs`, `fetch_logic_apps_doc`, `search_mulesoft_docs`) registered alongside their deterministic tools. The LLM decides when to call them.
+- **Testing**: 41 new tests (37 grounding + 4 wiring) with mocked HTTP. 165 total agent tests.
+- **Dependency**: Added `httpx>=0.27` (no advisories).
+- **Deviations**: Implemented as real HTTP providers (not abstract-only) per user feedback. No caching hooks added (deferred to future PR if needed).
 
 ### Prompt for Copilot Coding Agent
 ```text

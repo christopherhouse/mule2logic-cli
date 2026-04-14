@@ -410,7 +410,8 @@ class TestSearchLogicAppsDocs:
             search_logic_apps_docs("triggers")
 
             call_args = client_instance.get.call_args
-            params = call_args[1].get("params") or call_args[0][1] if len(call_args[0]) > 1 else call_args[1]["params"]
+            _, kwargs = call_args
+            params = kwargs.get("params", {})
             assert "Azure Logic Apps Standard" in params["search"]
 
     def test_returns_error_json_on_failure(self) -> None:

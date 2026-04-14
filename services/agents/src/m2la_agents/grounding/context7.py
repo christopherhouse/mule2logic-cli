@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 from typing import Any
+from urllib.parse import urlencode
 
 import httpx
 
@@ -146,7 +147,7 @@ class Context7Client:
 
         result = GroundingResult(
             title=f"Context7: {library_id}",
-            url=f"{self.BASE_URL}/context?libraryId={library_id}&query={query}",
+            url=_build_context_url(self.BASE_URL, library_id, query),
             content=content,
             source=_PROVIDER,
             metadata={"library_id": library_id, "tokens_requested": self._max_tokens},
@@ -164,6 +165,12 @@ class Context7Client:
 # ------------------------------------------------------------------
 # Helpers
 # ------------------------------------------------------------------
+
+
+def _build_context_url(base_url: str, library_id: str, query: str) -> str:
+    """Build a properly encoded URL for the Context7 context endpoint."""
+    qs = urlencode({"libraryId": library_id, "query": query})
+    return f"{base_url}/context?{qs}"
 
 
 def _parse_library_results(data: dict[str, Any]) -> list[GroundingResult]:
