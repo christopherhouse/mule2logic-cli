@@ -58,6 +58,34 @@ uv run uvicorn m2la_api.main:app --reload
 
 The API will be available at `http://127.0.0.1:8000`. API docs at `http://127.0.0.1:8000/docs`.
 
+#### API Endpoints
+
+**Transform Endpoints:**
+- `POST /transform` — Traditional transform (returns complete result)
+- `POST /transform/stream` — Streaming transform with Server-Sent Events (SSE)
+
+**Other Endpoints:**
+- `POST /analyze` — Analyze MuleSoft project and estimate migration complexity
+- `POST /validate` — Validate generated Logic Apps artifacts
+- `GET /health` — Health check endpoint
+
+**Streaming Example (curl):**
+```bash
+curl -N -F "file=@project.zip" http://127.0.0.1:8000/transform/stream
+```
+
+The streaming endpoint emits SSE events:
+```
+event: agent_started
+data: {"agent_name": "AnalyzerAgent", "correlation_id": "..."}
+
+event: agent_completed
+data: {"agent_name": "AnalyzerAgent", "status": "success", "duration_ms": 1234}
+
+event: complete
+data: {"overall_status": "success", "total_duration_ms": 5678}
+```
+
 #### API Environment Variables
 
 | Variable | Default | Description |
@@ -84,6 +112,35 @@ npm run build
 # Run the built CLI
 node dist/index.js
 ```
+
+### CLI Usage
+
+#### Transform Command
+
+```bash
+# Transform with default (non-streaming) mode
+m2la transform path/to/mule-project
+
+# Transform with streaming mode for real-time progress
+m2la transform path/to/mule-project --stream
+
+# Transform with custom output directory
+m2la transform path/to/mule-project -o ./my-output
+
+# Transform single flow XML
+m2la transform path/to/flow.xml --stream
+```
+
+**Streaming Mode** (`--stream`):
+- Provides real-time agent-by-agent progress updates
+- Shows duration for each pipeline stage
+- Better UX for long-running transformations
+- Uses Server-Sent Events (SSE) from the backend
+
+**Traditional Mode** (default):
+- Uses a spinner while waiting for completion
+- Returns full results once pipeline finishes
+- Compatible with older backend versions
 
 ## Development
 
