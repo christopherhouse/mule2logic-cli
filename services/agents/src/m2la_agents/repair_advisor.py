@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import time
 
-from azure.ai.agents.models import FunctionTool
 from m2la_contracts.enums import GapCategory, Severity
 from m2la_contracts.validate import ValidationIssue, ValidationReport
 from pydantic import BaseModel, Field
@@ -87,19 +86,18 @@ class RepairAdvisorAgent(BaseAgent):
     """
 
     def __init__(self) -> None:
-        from m2la_agents.prompts import REPAIR_ADVISOR_PROMPT
+        from m2la_agents.prompts import repair_advisor_prompt
 
         super().__init__(
             name="RepairAdvisorAgent",
-            instructions=REPAIR_ADVISOR_PROMPT,
+            instructions=repair_advisor_prompt(),
         )
 
-    def _register_tools(self) -> None:
-        """Register the ``suggest_repairs`` function tool."""
+    def _get_tools(self):  # noqa: ANN201
+        """Return the ``suggest_repairs`` function as a tool."""
         from m2la_agents.function_tools import suggest_repairs
 
-        functions = FunctionTool({suggest_repairs})
-        self.toolset.add(functions)
+        return [suggest_repairs]
 
     def execute(self, context: AgentContext) -> AgentResult:
         """Analyze issues and produce repair suggestions.

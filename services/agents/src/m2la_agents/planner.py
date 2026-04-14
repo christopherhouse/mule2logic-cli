@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import time
 
-from azure.ai.agents.models import FunctionTool
 from m2la_ir.models import (
     ConnectorOperation,
     Flow,
@@ -83,19 +82,18 @@ class PlannerAgent(BaseAgent):
     """
 
     def __init__(self) -> None:
-        from m2la_agents.prompts import PLANNER_PROMPT
+        from m2la_agents.prompts import planner_prompt
 
         super().__init__(
             name="PlannerAgent",
-            instructions=PLANNER_PROMPT,
+            instructions=planner_prompt(),
         )
 
-    def _register_tools(self) -> None:
-        """Register the ``create_migration_plan`` function tool."""
+    def _get_tools(self):  # noqa: ANN201
+        """Return the ``create_migration_plan`` function as a tool."""
         from m2la_agents.function_tools import create_migration_plan
 
-        functions = FunctionTool({create_migration_plan})
-        self.toolset.add(functions)
+        return [create_migration_plan]
 
     def execute(self, context: AgentContext) -> AgentResult:
         """Produce a migration plan from the analysis results.

@@ -23,8 +23,8 @@ class _SuccessAgent(BaseAgent):
     def __init__(self, name: str = "SuccessAgent") -> None:
         super().__init__(name=name)
 
-    def _register_tools(self) -> None:
-        pass  # No tools for test agent
+    def _get_tools(self):  # noqa: ANN201
+        return []  # No tools for test agent
 
     def execute(self, context: AgentContext) -> AgentResult:
         context.accumulated_data[self.name] = "done"
@@ -43,8 +43,8 @@ class _FailureAgent(BaseAgent):
     def __init__(self, name: str = "FailureAgent") -> None:
         super().__init__(name=name)
 
-    def _register_tools(self) -> None:
-        pass  # No tools for test agent
+    def _get_tools(self):  # noqa: ANN201
+        return []  # No tools for test agent
 
     def execute(self, context: AgentContext) -> AgentResult:
         return AgentResult(
@@ -62,8 +62,8 @@ class _PartialAgent(BaseAgent):
     def __init__(self, name: str = "PartialAgent") -> None:
         super().__init__(name=name)
 
-    def _register_tools(self) -> None:
-        pass  # No tools for test agent
+    def _get_tools(self):  # noqa: ANN201
+        return []  # No tools for test agent
 
     def execute(self, context: AgentContext) -> AgentResult:
         context.accumulated_data[self.name] = "partial"

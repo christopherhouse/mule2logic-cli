@@ -13,7 +13,6 @@ import time
 from pathlib import Path
 from typing import Any
 
-from azure.ai.agents.models import FunctionTool
 from m2la_contracts.enums import InputMode
 from m2la_contracts.validate import ValidationReport
 from m2la_validate.engine import validate_output
@@ -34,19 +33,18 @@ class ValidatorAgent(BaseAgent):
     """
 
     def __init__(self) -> None:
-        from m2la_agents.prompts import VALIDATOR_PROMPT
+        from m2la_agents.prompts import validator_prompt
 
         super().__init__(
             name="ValidatorAgent",
-            instructions=VALIDATOR_PROMPT,
+            instructions=validator_prompt(),
         )
 
-    def _register_tools(self) -> None:
-        """Register the ``validate_output_artifacts`` function tool."""
+    def _get_tools(self):  # noqa: ANN201
+        """Return the ``validate_output_artifacts`` function as a tool."""
         from m2la_agents.function_tools import validate_output_artifacts
 
-        functions = FunctionTool({validate_output_artifacts})
-        self.toolset.add(functions)
+        return [validate_output_artifacts]
 
     def execute(self, context: AgentContext) -> AgentResult:
         """Validate the generated Logic Apps artifacts.

@@ -1,12 +1,12 @@
-"""Deterministic service functions exposed as Azure AI Agent FunctionTool callables.
+"""Deterministic service functions exposed as Microsoft Agent Framework tools.
 
 Each function wraps a deterministic service call and returns a JSON-serializable
-``str`` result.  These functions serve as the tools that SDK-created agents can
-invoke when running in **online** mode (backed by the Azure AI Agent Service).
+``str`` result.  These functions are registered as tools on MAF ``Agent``
+instances via the ``tools=[...]`` parameter.
 
-The functions intentionally keep their signatures simple — only primitive /
-JSON-serializable parameters — because the SDK uses introspection to generate
-OpenAI-compatible function schemas exposed to the backing LLM.
+The functions keep their signatures simple — only primitive / JSON-serializable
+parameters — because MAF uses introspection to generate OpenAI-compatible
+function schemas exposed to the backing LLM.
 """
 
 from __future__ import annotations

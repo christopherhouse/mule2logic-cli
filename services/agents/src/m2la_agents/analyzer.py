@@ -17,7 +17,6 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
-from azure.ai.agents.models import FunctionTool
 from m2la_contracts.enums import InputMode
 from m2la_contracts.helpers import detect_input_mode
 from m2la_ir.builders import (
@@ -146,19 +145,18 @@ class AnalyzerAgent(BaseAgent):
     """
 
     def __init__(self) -> None:
-        from m2la_agents.prompts import ANALYZER_PROMPT
+        from m2la_agents.prompts import analyzer_prompt
 
         super().__init__(
             name="AnalyzerAgent",
-            instructions=ANALYZER_PROMPT,
+            instructions=analyzer_prompt(),
         )
 
-    def _register_tools(self) -> None:
-        """Register the ``analyze_mule_input`` function tool."""
+    def _get_tools(self):  # noqa: ANN201
+        """Return the ``analyze_mule_input`` function as a tool."""
         from m2la_agents.function_tools import analyze_mule_input
 
-        functions = FunctionTool({analyze_mule_input})
-        self.toolset.add(functions)
+        return [analyze_mule_input]
 
     def execute(self, context: AgentContext) -> AgentResult:
         """Parse, build IR, and validate the MuleSoft input.
