@@ -37,6 +37,7 @@ resource aiServices 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
     type: 'SystemAssigned'
   }
   properties: {
+    customSubDomainName: name
     publicNetworkAccess: 'Enabled'
   }
 }

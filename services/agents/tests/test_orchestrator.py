@@ -7,9 +7,13 @@ Includes both unit tests (mocked services) and integration tests
 from __future__ import annotations
 
 import json
-from collections.abc import Callable, Sequence
-from pathlib import Path
+from collections.abc import AsyncIterable, Callable, Sequence
 from typing import Any
+from pathlib import Path
+
+import pytest
+from agent_framework import ChatResponse, ChatResponseUpdate, Content, Message
+from agent_framework._types import ResponseStream
 
 from m2la_agents.base import BaseAgent
 from m2la_agents.models import AgentContext, AgentResult, AgentStatus
@@ -93,6 +97,60 @@ class _PartialAgent(BaseAgent):
             output={"partial": True},
             reasoning_summary=f"{self.name} partially completed",
             duration_ms=0.8,
+        )
+
+
+class _ErrorRaisingChatClient:
+    """A mock chat client that raises an exception during streaming.
+
+    Simulates errors like ``ChatClientException`` from the Foundry client
+    (e.g. authentication failures, bad endpoint configuration).
+    """
+
+    additional_properties: dict[str, Any]
+
+    def __init__(self, error: Exception | None = None) -> None:
+        self.additional_properties = {}
+        self._error = error or RuntimeError("Simulated chat client error")
+
+    def get_response(
+        self,
+        messages: Sequence[Message],
+        *,
+        stream: bool = False,
+        options: Any | None = None,
+        compaction_strategy: Any | None = None,
+        tokenizer: Any | None = None,
+        function_invocation_kwargs: Any | None = None,
+        client_kwargs: Any | None = None,
+    ) -> Any:
+        if stream:
+            return self._as_error_stream()
+        return self._as_error_awaitable()
+
+    def _as_error_awaitable(self) -> Any:
+        error = self._error
+
+        async def _coro() -> ChatResponse[Any]:
+            raise error
+
+        return _coro()
+
+    def _as_error_stream(self) -> ResponseStream[ChatResponseUpdate, ChatResponse[Any]]:
+        error = self._error
+
+        async def _stream() -> AsyncIterable[ChatResponseUpdate]:
+            raise error
+            yield  # type: ignore[misc]  # make it a generator
+
+        response = ChatResponse(
+            messages=[Message(role="assistant", contents=["error"])],
+            response_id="error",
+            finish_reason="stop",
+        )
+        return ResponseStream(
+            _stream(),
+            finalizer=lambda _updates: response,
         )
 
 
@@ -313,3 +371,43 @@ class TestOrchestratorIntegration:
         )
 
         assert result.correlation_id == "integration-test-cid"
+
+
+# ---------------------------------------------------------------------------
+# Exception propagation tests
+# ---------------------------------------------------------------------------
+
+
+class TestOrchestratorExceptionPropagation:
+    """Verify that workflow-level exceptions are not silently swallowed."""
+
+    def test_chat_client_error_propagates(self) -> None:
+        """An exception from the chat client must propagate to the caller.
+
+        Previously the orchestrator caught all exceptions silently and
+        returned a SUCCESS result with empty steps, causing the API to
+        return 200 OK with no data.
+        """
+        error_client = _ErrorRaisingChatClient(
+            error=RuntimeError("Simulated auth failure: custom subdomain required"),
+        )
+        orchestrator = MigrationOrchestrator(
+            agents=[_SuccessAgent("A")],
+            client=error_client,
+        )
+
+        with pytest.raises(RuntimeError, match="custom subdomain required"):
+            orchestrator.run("/fake/path")
+
+    def test_generic_workflow_error_propagates(self) -> None:
+        """A generic exception during workflow execution must propagate."""
+        error_client = _ErrorRaisingChatClient(
+            error=ValueError("Unexpected workflow error"),
+        )
+        orchestrator = MigrationOrchestrator(
+            agents=[_SuccessAgent("A")],
+            client=error_client,
+        )
+
+        with pytest.raises(ValueError, match="Unexpected workflow error"):
+            orchestrator.run("/fake/path")
