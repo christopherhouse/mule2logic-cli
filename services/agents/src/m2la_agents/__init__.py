@@ -4,12 +4,11 @@ This package implements **multi-agent orchestration** using the
 `Microsoft Agent Framework <https://github.com/microsoft/agent-framework>`_
 (``agent-framework-core``).
 
-In **online mode** (chat client provided), agents are constructed as MAF
-``Agent`` instances and composed into a ``SequentialBuilder`` workflow
-for LLM-backed multi-agent orchestration.
-
-In **offline mode** (default, for tests/CI), each agent's deterministic
-``execute()`` method is called directly — no LLM calls or network access.
+The LLM is the **required** execution engine.  All migration requests
+flow through LLM-backed agents composed into a ``SequentialBuilder``
+workflow via a chat client (e.g. ``FoundryChatClient``).  Five
+specialised agents (Analyzer, Planner, Transformer, Validator,
+RepairAdvisor) each call deterministic tool functions.
 """
 
 from m2la_agents.analyzer import AnalyzerAgent

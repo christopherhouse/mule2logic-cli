@@ -4,8 +4,8 @@ Each concrete agent extends :class:`BaseAgent` and implements:
 
 * :meth:`_get_tools` — return deterministic service functions to be
   registered as tools on the MAF ``Agent``.
-* :meth:`execute` — the offline / deterministic execution path used
-  when no LLM client is available.
+* :meth:`execute` — direct execution of the agent's deterministic
+  logic, used internally by tool functions.
 
 The base class provides helpers for constructing a MAF ``Agent``
 (:meth:`build_maf_agent`) and a standardised
@@ -27,14 +27,13 @@ if TYPE_CHECKING:
 class BaseAgent(ABC):
     """Abstract base class for migration agents.
 
-    Each agent can operate in two modes:
+    Each agent is backed by the LLM via the Microsoft Agent Framework.
+    :meth:`build_maf_agent` constructs a MAF ``Agent`` instance with
+    registered tool functions and domain-specific instructions.
 
-    * **Offline** (default) — :meth:`execute` is called directly with
-      no LLM involvement.  All logic is deterministic.
-    * **Online** — :meth:`build_maf_agent` constructs a Microsoft Agent
-      Framework ``Agent`` backed by a chat client (e.g.
-      ``FoundryChatClient``).  The LLM invokes the registered tool
-      functions and provides reasoning on top.
+    The :meth:`execute` method provides the underlying deterministic
+    logic that tool functions wrap.  In production, ``execute()`` is
+    only invoked through tool functions called by the LLM.
 
     Attributes:
         name: Human-readable agent name (e.g. ``"AnalyzerAgent"``).
@@ -62,7 +61,7 @@ class BaseAgent(ABC):
     # ------------------------------------------------------------------
 
     def build_maf_agent(self, client: Any) -> Agent:
-        """Construct a Microsoft Agent Framework ``Agent`` for online mode.
+        """Construct a Microsoft Agent Framework ``Agent``.
 
         Args:
             client: A MAF chat client (e.g. ``FoundryChatClient`` or
@@ -82,15 +81,18 @@ class BaseAgent(ABC):
         )
 
     # ------------------------------------------------------------------
-    # Execution (offline / deterministic path)
+    # Direct execution (used by tool functions)
     # ------------------------------------------------------------------
 
     @abstractmethod
     def execute(self, context: AgentContext) -> AgentResult:
-        """Run the agent's orchestration logic (offline/deterministic mode).
+        """Run the agent's deterministic logic directly.
 
-        This is the single entry point for every agent when running
-        **without** an LLM client.  Implementations should:
+        This method implements the core business logic that each
+        agent's tool function wraps.  In production the LLM invokes
+        tool functions which delegate here.
+
+        Implementations should:
 
         1. Extract required inputs from *context*.
         2. Call one or more deterministic services.
