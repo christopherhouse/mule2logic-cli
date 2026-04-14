@@ -890,7 +890,7 @@ Include tests that verify:
 
 ---
 
-## PR-010 — Supported Construct Transformations v1
+## PR-010 — Supported Construct Transformations v1 ✅ COMPLETE
 
 ### Goal
 Implement actual conversion for a solid MVP set.
@@ -915,6 +915,8 @@ Implement actual conversion for a solid MVP set.
 - conversion works for representative sample projects (project mode)
 - conversion works for standalone flow XML files (single-flow mode)
 - unsupported constructs create explicit migration gaps, not silent drops
+
+**Completed**: 2026-04-14. Implemented full MVP construct transformations in `services/transform/`. All constructs from spec §7 supported with recursive nested step conversion. DataWeave basic expression conversion added. Golden tests for both project mode (hello-world) and single-flow mode (standalone-flow.xml). 80 pytest tests pass (40 existing + 34 new construct tests + 4 golden tests + 2 new connector tests). No deviations from spec.
 
 ### Prompt for Copilot Coding Agent
 ```text

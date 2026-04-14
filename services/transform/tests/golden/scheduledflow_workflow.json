@@ -1,0 +1,26 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "set_payload_0": {
+        "inputs": {
+          "payload": "Scheduled task executed"
+        },
+        "runAfter": {},
+        "type": "Compose"
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "triggers": {
+      "Recurrence": {
+        "recurrence": {
+          "frequency": "Second",
+          "interval": 60
+        },
+        "type": "Recurrence"
+      }
+    }
+  },
+  "kind": "Stateful"
+}

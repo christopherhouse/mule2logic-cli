@@ -25,14 +25,21 @@ from typing import Any
 
 from m2la_contracts.common import MigrationGap
 from m2la_contracts.enums import GapCategory, Severity
-from m2la_ir.enums import ConnectorType, ErrorHandlerType, ProcessorType, RouterType, ScopeType, TransformType, TriggerType
+from m2la_ir.enums import (
+    ConnectorType,
+    ErrorHandlerType,
+    ProcessorType,
+    RouterType,
+    ScopeType,
+    TransformType,
+    TriggerType,
+)
 from m2la_ir.models import (
     ConnectorOperation,
     ErrorHandler,
     Flow,
     FlowStep,
     Processor,
-    Route,
     Router,
     Scope,
     Transform,
@@ -126,6 +133,7 @@ def _make_gap(
 
 # ── Recursive step conversion ────────────────────────────────────────────────
 
+
 def _convert_steps(
     steps: list[FlowStep],
     sub_flows: dict[str, Flow] | None = None,
@@ -148,7 +156,10 @@ def _convert_steps(
 
     for step_index, step in enumerate(steps):
         action_name, action_dict, step_gaps = _map_step(
-            step, step_index, previous_action_name, sub_flows=sub_flows,
+            step,
+            step_index,
+            previous_action_name,
+            sub_flows=sub_flows,
         )
         all_gaps.extend(step_gaps)
 
@@ -163,6 +174,7 @@ def _convert_steps(
 
 
 # ── Trigger mapping ──────────────────────────────────────────────────────────
+
 
 def _map_scheduler_frequency(frequency: str, time_unit: str) -> tuple[str, int]:
     """Convert MuleSoft scheduler frequency/timeUnit to Logic Apps recurrence params."""
@@ -248,6 +260,7 @@ def _map_trigger(
 
 
 # ── Connector operation mapping ───────────────────────────────────────────────
+
 
 def _map_connector_operation(
     step: ConnectorOperation,
@@ -372,8 +385,7 @@ def _map_connector_operation(
                 construct_name=f"connector:{step.connector_type}",
                 source_location=src,
                 message=(
-                    "Email/SMTP mapped to Office 365 Outlook managed connector. "
-                    "SMTP auth must be migrated to OAuth2."
+                    "Email/SMTP mapped to Office 365 Outlook managed connector. SMTP auth must be migrated to OAuth2."
                 ),
                 category=GapCategory.PARTIAL_SUPPORT,
                 severity=Severity.WARNING,
@@ -407,6 +419,7 @@ def _map_connector_operation(
 
 # ── Error handler mapping ────────────────────────────────────────────────────
 
+
 def _map_error_handlers(
     error_handlers: list[ErrorHandler],
     preceding_action_name: str,
@@ -426,7 +439,6 @@ def _map_error_handlers(
     gaps: list[MigrationGap] = []
 
     for idx, handler in enumerate(error_handlers):
-        src = _source_location_str(handler)
         handler_name = _sanitize_name(f"error_handler_{handler.type}_{idx}")
 
         # Build nested actions from the handler's steps
@@ -447,10 +459,7 @@ def _map_error_handlers(
 
         # Annotate error type filter if specified
         if handler.error_type:
-            scope_action["description"] = (
-                f"Error handler for type '{handler.error_type}' "
-                f"({handler.type})"
-            )
+            scope_action["description"] = f"Error handler for type '{handler.error_type}' ({handler.type})"
 
         if handler.type == ErrorHandlerType.ON_ERROR_CONTINUE:
             scope_action["description"] = scope_action.get("description", "") + (
@@ -463,6 +472,7 @@ def _map_error_handlers(
 
 
 # ── Step mapping ──────────────────────────────────────────────────────────────
+
 
 def _map_step(
     step: FlowStep,
@@ -519,7 +529,8 @@ def _map_step(
             if referenced_flow is not None:
                 # Inline sub-flow steps as a Scope
                 inner_actions, inner_gaps = _convert_steps(
-                    referenced_flow.steps, sub_flows,
+                    referenced_flow.steps,
+                    sub_flows,
                 )
                 gaps.extend(inner_gaps)
                 action = {
@@ -686,9 +697,7 @@ def _map_step(
                 message=f"Router type '{step.type}' has no direct Logic Apps equivalent.",
                 category=GapCategory.UNSUPPORTED_CONSTRUCT,
                 severity=Severity.ERROR,
-                suggested_workaround=(
-                    "Implement the equivalent routing logic using Logic Apps conditional actions."
-                ),
+                suggested_workaround=("Implement the equivalent routing logic using Logic Apps conditional actions."),
             )
         )
         action = {
@@ -760,10 +769,7 @@ def _map_step(
                 _make_gap(
                     construct_name="scope:until_successful",
                     source_location=src,
-                    message=(
-                        "until-successful mapped to Until loop. "
-                        "Review loop condition and retry parameters."
-                    ),
+                    message=("until-successful mapped to Until loop. Review loop condition and retry parameters."),
                     category=GapCategory.PARTIAL_SUPPORT,
                     severity=Severity.WARNING,
                     suggested_workaround="Adjust the Until loop expression and limit to match retry semantics.",
@@ -779,23 +785,18 @@ def _map_step(
                 "actions": inner_actions,
                 "runAfter": run_after,
                 "description": (
-                    "Converted from async scope — fire-and-forget semantics "
-                    "are not preserved. Review carefully."
+                    "Converted from async scope — fire-and-forget semantics are not preserved. Review carefully."
                 ),
             }
             gaps.append(
                 _make_gap(
                     construct_name="scope:async_scope",
                     source_location=src,
-                    message=(
-                        "Async scope converted to sequential Scope. "
-                        "Fire-and-forget semantics are not preserved."
-                    ),
+                    message=("Async scope converted to sequential Scope. Fire-and-forget semantics are not preserved."),
                     category=GapCategory.PARTIAL_SUPPORT,
                     severity=Severity.WARNING,
                     suggested_workaround=(
-                        "Consider using a separate workflow triggered via HTTP or "
-                        "Service Bus for true async behavior."
+                        "Consider using a separate workflow triggered via HTTP or Service Bus for true async behavior."
                     ),
                 )
             )
@@ -843,6 +844,7 @@ def _map_step(
 
 # ── Choice router mapping ────────────────────────────────────────────────────
 
+
 def _map_choice_router(
     step: Router,
     action_name: str,
@@ -874,9 +876,7 @@ def _map_choice_router(
                         ),
                         category=GapCategory.PARTIAL_SUPPORT,
                         severity=Severity.WARNING,
-                        suggested_workaround=(
-                            "Convert the DataWeave condition to a Logic Apps expression."
-                        ),
+                        suggested_workaround=("Convert the DataWeave condition to a Logic Apps expression."),
                     )
                 )
             true_actions, inner_gaps = _convert_steps(first_route.steps, sub_flows)
@@ -908,9 +908,7 @@ def _map_choice_router(
                 _make_gap(
                     construct_name="router:choice",
                     source_location=src,
-                    message=(
-                        f"Choice router condition for case {route_idx} could not be auto-translated."
-                    ),
+                    message=(f"Choice router condition for case {route_idx} could not be auto-translated."),
                     category=GapCategory.PARTIAL_SUPPORT,
                     severity=Severity.WARNING,
                     suggested_workaround="Convert the DataWeave condition to a Logic Apps expression.",
@@ -939,10 +937,7 @@ def _map_choice_router(
         _make_gap(
             construct_name="router:choice",
             source_location=src,
-            message=(
-                "Multi-branch choice router mapped to Switch action. "
-                "The switch expression must be set manually."
-            ),
+            message=("Multi-branch choice router mapped to Switch action. The switch expression must be set manually."),
             category=GapCategory.PARTIAL_SUPPORT,
             severity=Severity.WARNING,
             suggested_workaround=(
@@ -955,6 +950,7 @@ def _map_choice_router(
 
 
 # ── Scatter-gather mapping ────────────────────────────────────────────────────
+
 
 def _map_scatter_gather(
     step: Router,
@@ -999,10 +995,7 @@ def _map_scatter_gather(
         _make_gap(
             construct_name="router:scatter_gather",
             source_location=src,
-            message=(
-                "Scatter-gather mapped to parallel branch pattern. "
-                "Aggregation logic must be manually reviewed."
-            ),
+            message=("Scatter-gather mapped to parallel branch pattern. Aggregation logic must be manually reviewed."),
             category=GapCategory.PARTIAL_SUPPORT,
             severity=Severity.WARNING,
             suggested_workaround=(
@@ -1022,6 +1015,7 @@ def _map_scatter_gather(
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
+
 
 def generate_workflow(
     flow: Flow,
@@ -1059,7 +1053,9 @@ def generate_workflow(
         last_action_name = list(actions.keys())[-1] if actions else ""
         if last_action_name:
             error_actions, error_gaps = _map_error_handlers(
-                flow.error_handlers, last_action_name, sub_flows,
+                flow.error_handlers,
+                last_action_name,
+                sub_flows,
             )
             all_gaps.extend(error_gaps)
             actions.update(error_actions)

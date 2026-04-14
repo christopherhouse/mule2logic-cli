@@ -1,0 +1,86 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "error_handler_on_error_propagate_0": {
+        "actions": {
+          "set_payload_0": {
+            "inputs": {
+              "payload": "Connection failed"
+            },
+            "runAfter": {},
+            "type": "Compose"
+          }
+        },
+        "description": "Error handler for type 'HTTP:CONNECTIVITY' (on_error_propagate)",
+        "runAfter": {
+          "http_request_request_3": [
+            "Failed",
+            "TimedOut"
+          ]
+        },
+        "type": "Scope"
+      },
+      "flow_ref_2": {
+        "actions": {},
+        "description": "MIGRATION GAP: flow-ref to 'externalProcessingFlow' could not be resolved",
+        "runAfter": {
+          "transform_1": [
+            "Succeeded"
+          ]
+        },
+        "type": "Scope"
+      },
+      "http_request_request_3": {
+        "inputs": {
+          "method": "GET",
+          "uri": "${backend.url}/items"
+        },
+        "runAfter": {
+          "flow_ref_2": [
+            "Succeeded"
+          ]
+        },
+        "type": "Http"
+      },
+      "set_variable_apikey_0": {
+        "inputs": {
+          "variables": [
+            {
+              "name": "apiKey",
+              "type": "String",
+              "value": "${api.key}"
+            }
+          ]
+        },
+        "runAfter": {},
+        "type": "InitializeVariable"
+      },
+      "transform_1": {
+        "inputs": {
+          "expression": "%dw 2.0\noutput application/json\n---\n{\n    data: payload,\n    key: vars.apiKey\n}"
+        },
+        "runAfter": {
+          "set_variable_apikey_0": [
+            "Succeeded"
+          ]
+        },
+        "type": "Compose"
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "triggers": {
+      "manual": {
+        "inputs": {
+          "method": "GET",
+          "schema": {}
+        },
+        "kind": "Http",
+        "operationOptions": "EnableSchemaValidation",
+        "type": "Request"
+      }
+    }
+  },
+  "kind": "Stateful"
+}

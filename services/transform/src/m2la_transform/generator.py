@@ -190,9 +190,7 @@ def generate_project(
     env_content = _ENV_CONTENT
 
     # 5. Build sub-flow lookup for flow-ref resolution
-    sub_flows: dict[str, Flow] = {
-        flow.name: flow for flow in ir.flows if flow.kind == FlowKind.SUB_FLOW
-    }
+    sub_flows: dict[str, Flow] = {flow.name: flow for flow in ir.flows if flow.kind == FlowKind.SUB_FLOW}
 
     # 6. Per-flow workflow generation
     workflows: dict[str, dict[str, Any]] = {}
