@@ -226,3 +226,42 @@ export function printValidationResult(report: ValidationReport): void {
 
   console.log();
 }
+
+/**
+ * Print streaming progress for an agent.
+ */
+export function printStreamingProgress(
+  agentName: string,
+  status: "started" | "completed" | "error",
+  durationMs?: number,
+): void {
+  if (status === "started") {
+    console.log(chalk.cyan(`  🔄  ${agentName} started...`));
+  } else if (status === "completed") {
+    const duration = durationMs ? ` (${(durationMs / 1000).toFixed(1)}s)` : "";
+    console.log(chalk.green(`  ✅  ${agentName} completed${duration}`));
+  } else if (status === "error") {
+    console.log(chalk.red(`  ❌  ${agentName} failed`));
+  }
+}
+
+/**
+ * Print final streaming completion summary.
+ */
+export function printStreamingComplete(
+  overallStatus: string,
+  totalDurationMs: number,
+  steps: number,
+): void {
+  console.log();
+  const duration = (totalDurationMs / 1000).toFixed(1);
+  if (overallStatus === "success") {
+    console.log(chalk.bold.green(`  ✅  Pipeline completed successfully in ${duration}s`));
+  } else if (overallStatus === "failure") {
+    console.log(chalk.bold.red(`  ❌  Pipeline failed after ${duration}s`));
+  } else {
+    console.log(chalk.bold.yellow(`  ⚠️   Pipeline completed with warnings in ${duration}s`));
+  }
+  console.log(chalk.white(`      Agents executed: ${steps}`));
+  console.log();
+}

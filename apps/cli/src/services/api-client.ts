@@ -7,6 +7,16 @@ import type { AnalyzeResponse, TransformResponse, ValidationReport } from "@m2la
 import { CliError } from "../ui/errors.js";
 import type { PackageResult } from "./project-packager.js";
 
+/** Streaming event from the backend. */
+export interface StreamingEvent {
+  event_type: string;
+  timestamp: string;
+  correlation_id: string;
+  agent_name: string | null;
+  message: string | null;
+  data: Record<string, unknown>;
+}
+
 /** API client for the migration backend. */
 export class ApiClient {
   private readonly baseUrl: string;
@@ -45,6 +55,125 @@ export class ApiClient {
       formData.append("output_directory", outputDirectory);
     }
     return this.postMultipart<TransformResponse>("/transform", formData);
+  }
+
+  /**
+   * Send a streaming transform request with Server-Sent Events.
+   * Returns an async generator that yields events as they arrive.
+   */
+  async *transformStreaming(
+    pkg: PackageResult,
+    mode?: string,
+    outputDirectory?: string,
+  ): AsyncGenerator<StreamingEvent, void, unknown> {
+    const formData = this.buildFormData(pkg);
+    if (mode) {
+      formData.append("mode", mode);
+    }
+    if (outputDirectory) {
+      formData.append("output_directory", outputDirectory);
+    }
+
+    const url = `${this.baseUrl}/transform/stream`;
+    const headers: Record<string, string> = {};
+    if (this.apiToken) {
+      headers["x-api-token"] = this.apiToken;
+    }
+
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: "POST",
+        headers,
+        body: formData,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Connection failed";
+      throw new CliError(
+        "BACKEND_UNREACHABLE",
+        `Cannot connect to backend at ${this.baseUrl}: ${message}`,
+        `Ensure the backend is running at ${this.baseUrl}.`,
+      );
+    }
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new CliError(
+          "UNAUTHORIZED",
+          "Backend rejected the request — invalid or missing API token.",
+          "Set the M2LA_API_TOKEN environment variable or pass --api-token <token>.",
+        );
+      }
+
+      throw new CliError(
+        "BACKEND_ERROR",
+        `Backend returned ${response.status} ${response.statusText}`,
+        "Check backend logs for details.",
+      );
+    }
+
+    if (!response.body) {
+      throw new CliError(
+        "BACKEND_ERROR",
+        "Backend response has no body",
+        "This should not happen with streaming responses.",
+      );
+    }
+
+    // Parse SSE stream
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        // Process complete events (separated by double newlines)
+        const events = buffer.split("\n\n");
+        buffer = events.pop() || ""; // Keep incomplete event in buffer
+
+        for (const eventText of events) {
+          if (!eventText.trim()) continue;
+
+          const event = this.parseSSE(eventText);
+          if (event) {
+            yield event;
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+  }
+
+  /**
+   * Parse a single SSE event from text.
+   */
+  private parseSSE(eventText: string): StreamingEvent | null {
+    const lines = eventText.split("\n");
+    let eventType = "";
+    let data = "";
+
+    for (const line of lines) {
+      if (line.startsWith("event:")) {
+        eventType = line.substring(6).trim();
+      } else if (line.startsWith("data:")) {
+        data = line.substring(5).trim();
+      }
+    }
+
+    if (!data) return null;
+
+    try {
+      const parsed = JSON.parse(data) as StreamingEvent;
+      return parsed;
+    } catch {
+      return null;
+    }
   }
 
   /**
