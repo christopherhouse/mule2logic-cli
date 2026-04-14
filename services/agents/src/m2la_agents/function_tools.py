@@ -5,7 +5,7 @@ Each function wraps a deterministic service call and returns a JSON-serializable
 invoke when running in **online** mode (backed by the Azure AI Agent Service).
 
 The functions intentionally keep their signatures simple — only primitive /
-JSON-serialisable parameters — because the SDK uses introspection to generate
+JSON-serializable parameters — because the SDK uses introspection to generate
 OpenAI-compatible function schemas exposed to the backing LLM.
 """
 
@@ -20,7 +20,7 @@ from pathlib import Path
 
 
 def analyze_mule_input(input_path: str, mode: str | None = None) -> str:
-    """Parse and analyse a MuleSoft project or flow XML file.
+    """Parse and analyze a MuleSoft project or flow XML file.
 
     Calls the deterministic parser, IR builder, and input validator to
     produce a structured analysis summary.

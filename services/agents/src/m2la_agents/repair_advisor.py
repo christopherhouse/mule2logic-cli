@@ -91,7 +91,7 @@ class RepairAdvisorAgent(BaseAgent):
             name="RepairAdvisorAgent",
             instructions=(
                 "You are a repair advisor agent for MuleSoft to Logic Apps migration. "
-                "Use the suggest_repairs tool to analyse validation issues and migration "
+                "Use the suggest_repairs tool to analyze validation issues and migration "
                 "gaps and produce actionable repair suggestions."
             ),
         )
