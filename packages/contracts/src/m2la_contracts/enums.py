@@ -39,3 +39,12 @@ class ConstructCategory(StrEnum):
     TRANSFORM = "transform"
     SCOPE = "scope"
     FLOW_CONTROL = "flow_control"
+
+
+class ValidationCategory(StrEnum):
+    """Categories for validation checks."""
+
+    MULE_INPUT = "mule_input"
+    IR_INTEGRITY = "ir_integrity"
+    OUTPUT_INTEGRITY = "output_integrity"
+    CONNECTOR_PREFERENCE = "connector_preference"

@@ -6,7 +6,7 @@ the Python backend (FastAPI) and the TypeScript CLI.
 
 from m2la_contracts.analyze import AnalyzeRequest, AnalyzeResponse, FlowAnalysis
 from m2la_contracts.common import ArtifactEntry, ArtifactManifest, ConstructCount, MigrationGap, Warning
-from m2la_contracts.enums import ConstructCategory, GapCategory, InputMode, Severity
+from m2la_contracts.enums import ConstructCategory, GapCategory, InputMode, Severity, ValidationCategory
 from m2la_contracts.helpers import detect_input_mode
 from m2la_contracts.telemetry import TelemetryContext
 from m2la_contracts.transform import TransformRequest, TransformResponse
@@ -18,6 +18,7 @@ __all__ = [
     "GapCategory",
     "InputMode",
     "Severity",
+    "ValidationCategory",
     # Telemetry
     "TelemetryContext",
     # Common models
