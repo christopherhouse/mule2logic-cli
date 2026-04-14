@@ -1024,7 +1024,7 @@ Add tests for both passing and failing cases in both project mode and single-flo
 
 **Completed: 2026-04-14**
 
-Delivered all five specialized agents (AnalyzerAgent, PlannerAgent, TransformerAgent, ValidatorAgent, RepairAdvisorAgent) plus MigrationOrchestrator in `services/agents/`. All agents are thin deterministic wrappers around existing services — no LLM calls. 75 tests passing (unit + integration with real sample fixtures). Design is extensible for future MCP/LLM integrations via `tools` list on BaseAgent. README documents architecture, data flow, deterministic vs orchestration boundary, and extension points.
+Delivered all five specialized agents (AnalyzerAgent, PlannerAgent, TransformerAgent, ValidatorAgent, RepairAdvisorAgent) plus MigrationOrchestrator in `services/agents/`, integrated with the Azure AI Agents SDK (`azure-ai-agents` v1.1.0). Each agent registers deterministic service logic as `FunctionTool` callables via the SDK's `ToolSet`. Agents are created on the Azure AI Agent Service via `AgentsClient.create_agent()` in online mode, or execute deterministic logic directly in offline mode (for tests/CI). 118 tests passing (75 original + 36 SDK integration + 7 function tool wrapper tests). README documents architecture, online/offline modes, configuration, and SDK integration.
 
 ### Goal
 Wrap deterministic services in agentic orchestration.
