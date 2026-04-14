@@ -85,6 +85,43 @@ describe("UI output helpers", () => {
     expect(output).toContain("1");
   });
 
+  it("printAnalysisResult should display warnings and gaps when present", () => {
+    const response: AnalyzeResponse = {
+      mode: "project",
+      project_name: "test-project",
+      flows: [],
+      overall_constructs: { supported: 3, unsupported: 2, partial: 1, details: {} },
+      gaps: [
+        {
+          construct_name: "mule-http-connector",
+          source_location: "flow.xml:42",
+          category: "unsupported_construct",
+          severity: "warning",
+          message: "HTTP connector not supported",
+          suggested_workaround: "Use Azure API Management",
+        },
+      ],
+      warnings: [
+        {
+          code: "MISSING_CONFIG",
+          message: "Connector configuration not found",
+          severity: "warning",
+          source_location: "flow.xml:10",
+        },
+      ],
+      telemetry: { trace_id: "t1", span_id: "s1", correlation_id: "c1" },
+    };
+
+    printAnalysisResult(response);
+    const output = consoleSpy.mock.calls.map((c) => String(c[0] ?? "")).join("\n");
+    expect(output).toContain("Warnings:");
+    expect(output).toContain("MISSING_CONFIG");
+    expect(output).toContain("Connector configuration not found");
+    expect(output).toContain("Migration Gaps:");
+    expect(output).toContain("mule-http-connector");
+    expect(output).toContain("Use Azure API Management");
+  });
+
   it("printTransformResult should display summary", () => {
     const response: TransformResponse = {
       mode: "project",
@@ -104,6 +141,71 @@ describe("UI output helpers", () => {
     const output = consoleSpy.mock.calls.map((c) => String(c[0] ?? "")).join("\n");
     expect(output).toContain("Transform Summary");
     expect(output).toContain("1");
+  });
+
+  it("printTransformResult should display warnings and gaps when present", () => {
+    const response: TransformResponse = {
+      mode: "project",
+      project_name: "test-project",
+      artifacts: {
+        artifacts: [{ path: "workflow.json", artifact_type: "workflow" }],
+        output_directory: "./output",
+        mode: "project",
+      },
+      gaps: [
+        {
+          construct_name: "batch-processing",
+          source_location: "batch.xml:15",
+          category: "unsupported_construct",
+          severity: "error",
+          message: "Batch processing not supported in Logic Apps",
+        },
+      ],
+      warnings: [
+        {
+          code: "AGENT_REASONING",
+          message: "[TransformerAgent] Using HTTP connector for API calls",
+          severity: "info",
+        },
+      ],
+      constructs: { supported: 8, unsupported: 2, partial: 1, details: {} },
+      telemetry: { trace_id: "t1", span_id: "s1", correlation_id: "c1" },
+    };
+
+    printTransformResult(response);
+    const output = consoleSpy.mock.calls.map((c) => String(c[0] ?? "")).join("\n");
+    expect(output).toContain("Warnings:");
+    expect(output).toContain("AGENT_REASONING");
+    expect(output).toContain("Migration Gaps:");
+    expect(output).toContain("batch-processing");
+  });
+
+  it("printTransformResult should show error message when no artifacts generated", () => {
+    const response: TransformResponse = {
+      mode: "project",
+      project_name: "test-project",
+      artifacts: {
+        artifacts: [],
+        output_directory: "./output",
+        mode: "project",
+      },
+      gaps: [],
+      warnings: [
+        {
+          code: "PARSE_ERROR",
+          message: "Failed to parse flow XML",
+          severity: "error",
+        },
+      ],
+      constructs: { supported: 0, unsupported: 0, partial: 0, details: {} },
+      telemetry: { trace_id: "t1", span_id: "s1", correlation_id: "c1" },
+    };
+
+    printTransformResult(response);
+    const output = consoleSpy.mock.calls.map((c) => String(c[0] ?? "")).join("\n");
+    expect(output).toContain("No artifacts were generated");
+    expect(output).toContain("transformation pipeline encountered errors");
+    expect(output).toContain("Check the warnings and gaps above");
   });
 
   it("printValidationResult should show passed state", () => {
