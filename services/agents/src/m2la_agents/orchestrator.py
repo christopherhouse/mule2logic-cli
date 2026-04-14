@@ -105,6 +105,17 @@ class MigrationOrchestrator:
         cid = correlation_id or str(uuid.uuid4())
         pipeline_start = time.monotonic()
 
+        # Handle empty agent list early
+        if not self.agents:
+            total_ms = (time.monotonic() - pipeline_start) * 1000
+            return OrchestrationResult(
+                correlation_id=cid,
+                steps=[],
+                overall_status=AgentStatus.SUCCESS,
+                total_duration_ms=total_ms,
+                final_output=None,
+            )
+
         # Build MAF agents from our BaseAgent wrappers
         maf_agents: list[Agent] = []
         for agent in self.agents:
