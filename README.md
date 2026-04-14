@@ -64,6 +64,8 @@ The API will be available at `http://127.0.0.1:8000`. API docs at `http://127.0.
 |----------|---------|-------------|
 | `M2LA_HOST` | `127.0.0.1` | API server bind address |
 | `M2LA_PORT` | `8000` | API server port |
+| `LOG_LEVEL` | `INFO` | Python logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL) |
+| `APPLICATIONINSIGHTS_CONNECTION_STRING` | (none) | Azure Monitor connection string for telemetry export |
 
 ### CLI (TypeScript)
 
