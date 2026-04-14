@@ -11,6 +11,8 @@ dependencies = [
     "m2la-transform",
     "m2la-validate",
     "m2la-mapping-config",
+    "azure-ai-agents>=1.0",
+    "azure-identity>=1.0",
 ]
 
 [dependency-groups]
