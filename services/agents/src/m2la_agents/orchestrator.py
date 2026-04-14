@@ -197,8 +197,22 @@ class MigrationOrchestrator:
 
         orchestrator_response = ""
         try:
+            try:
+                asyncio.get_running_loop()
+            except RuntimeError:
+                pass  # No running loop — safe to use asyncio.run()
+            else:
+                msg = (
+                    "MigrationOrchestrator.run() cannot execute online mode from a running event loop. "
+                    "Use an async orchestration entry point for online execution instead."
+                )
+                logger.error(msg)
+                raise RuntimeError(msg)
+
             orchestrator_response = asyncio.run(self._execute_workflow(workflow, user_message))
             logger.info("Workflow completed with response length: %d", len(orchestrator_response))
+        except RuntimeError:
+            raise  # Propagate loop-detection error; do not swallow as a workflow failure
         except Exception:
             logger.warning("Online workflow execution failed, using offline results only", exc_info=True)
 
@@ -228,8 +242,14 @@ class MigrationOrchestrator:
             final_output = result.output
 
         # Attach the LLM's reasoning
-        if orchestrator_response and isinstance(final_output, dict):
-            final_output["orchestrator_reasoning"] = orchestrator_response
+        if orchestrator_response:
+            if isinstance(final_output, dict):
+                final_output["orchestrator_reasoning"] = orchestrator_response
+            else:
+                final_output = {
+                    "result": final_output,
+                    "orchestrator_reasoning": orchestrator_response,
+                }
 
         total_ms = (time.monotonic() - pipeline_start) * 1000
 

@@ -94,11 +94,14 @@ class TransformerAgent(BaseAgent):
                 elapsed_ms = (time.monotonic() - start) * 1000
                 return AgentResult(
                     agent_name=self.name,
-                    status=AgentStatus.PARTIAL,
+                    status=AgentStatus.FAILURE,
                     output={"ir_validation": ir_report},
-                    reasoning_summary=f"IR validation found {len(ir_report.issues)} issue(s); proceeding with caution",
+                    reasoning_summary=(
+                        f"IR validation found {len(ir_report.issues)} issue(s); cannot proceed with transformation"
+                    ),
                     duration_ms=elapsed_ms,
                     warnings=warnings,
+                    error_message=f"IR validation failed with {len(ir_report.issues)} issue(s)",
                 )
 
             # 2. Generate artifacts

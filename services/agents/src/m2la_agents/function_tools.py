@@ -127,11 +127,11 @@ def create_migration_plan(ir_json: str) -> str:
                         }
                     )
                 else:
-                    partial += count
+                    unsupported += count
                     decisions.append(
                         {
                             "mule_element": element_name,
-                            "status": "partial",
+                            "status": "unsupported",
                             "logic_apps_equivalent": construct_entry.logic_apps_type,
                             "notes": construct_entry.notes,
                         }
@@ -213,14 +213,15 @@ def transform_to_logic_apps(
 # ---------------------------------------------------------------------------
 
 
-def validate_output_artifacts(output_path: str, mode: str) -> str:
+def validate_output_artifacts(output_path_or_json: str, mode: str) -> str:
     """Validate generated Logic Apps artifacts.
 
     Runs the deterministic validation engine against the output.
 
     Args:
-        output_path: Filesystem path to the generated output directory
-            or a workflow dict path.
+        output_path_or_json: For project mode, a filesystem path to the
+            generated output directory.  For single_flow mode, a JSON string
+            containing the workflow definition dict.
         mode: Input mode — ``"project"`` or ``"single_flow"``.
 
     Returns:
@@ -230,7 +231,13 @@ def validate_output_artifacts(output_path: str, mode: str) -> str:
     from m2la_validate.engine import validate_output
 
     resolved_mode = InputMode(mode)
-    target = Path(output_path)
+
+    target: Path | dict
+    if resolved_mode == InputMode.SINGLE_FLOW:
+        target = json.loads(output_path_or_json)
+    else:
+        target = Path(output_path_or_json)
+
     report = validate_output(target, resolved_mode)
 
     issues = [{"rule_id": i.rule_id, "message": i.message, "severity": i.severity.value} for i in report.issues]

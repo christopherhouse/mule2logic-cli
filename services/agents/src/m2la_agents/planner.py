@@ -168,11 +168,11 @@ class PlannerAgent(BaseAgent):
                                 )
                             )
                         else:
-                            partial += construct_summary.get(element_name, 0)
+                            unsupported += construct_summary.get(element_name, 0)
                             decisions.append(
                                 MappingDecision(
                                     mule_element=element_name,
-                                    status="partial",
+                                    status="unsupported",
                                     logic_apps_equivalent=construct_entry.logic_apps_type,
                                     notes=construct_entry.notes,
                                 )
