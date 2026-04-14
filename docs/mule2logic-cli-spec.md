@@ -21,12 +21,16 @@ This product converts MuleSoft (Anypoint) projects into Azure Logic Apps Standar
 ## 3. Architecture
 
 ### Components
-- CLI (TypeScript)
-- API Layer (Python FastAPI)
-- Agent Orchestrator (Microsoft Agent Framework)
-- Optional Foundry Agents (only if needed)
-- IR Engine (Python)
-- Validator Engine (Python)
+- **CLI** (TypeScript) — validates input, submits to API, displays results
+- **API Layer** (Python FastAPI) — receives requests, manages Foundry client lifecycle, delegates to Agent Orchestrator
+- **Agent Orchestrator** (Microsoft Agent Framework) — the core execution engine. All API requests flow through LLM-backed agents composed into a `SequentialBuilder` workflow via `FoundryChatClient`. Five specialized agents (Analyzer, Planner, Transformer, Validator, RepairAdvisor) each call deterministic tool functions.
+- **Azure AI Foundry** — required dependency providing LLM backing (e.g., GPT-4o) for all agent operations. Not optional.
+- **Deterministic Tool Functions** (Python) — parsing, IR generation, mapping resolution, transformation, and validation implemented as testable Python functions. Agents invoke these as tools — the LLM decides when and how to call them.
+
+### Request Flow
+```
+CLI → API → Agent Orchestrator → LLM (Foundry) → Tool Calls → Structured Response
+```
 
 ---
 
@@ -122,11 +126,13 @@ End-to-end OpenTelemetry:
 
 ## 10. Hosting
 
-Default:
-- Azure Container Apps
+Runtime:
+- **Azure Container Apps** for the API backend
 
-Foundry Agents:
-- Only used if orchestration requires it
+LLM Backing:
+- **Azure AI Foundry** is a required dependency — provides the LLM (e.g., GPT-4o) that powers all agent operations
+- The API connects to Foundry via `FoundryChatClient` using UAMI credentials
+- Configured via `M2LA_FOUNDRY_ENDPOINT` and `M2LA_FOUNDRY_MODEL` env vars
 
 ---
 

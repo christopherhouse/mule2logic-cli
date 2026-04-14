@@ -50,16 +50,10 @@ Before starting **any** PR, the implementing agent **must**:
 
 ## Principles
 1. Build the platform in **vertical slices**.
-2. Land **deterministic foundations first** before complex agent behavior.
-3. Keep the agent layer thin until:
-   - Mule project parsing
-   - IR generation
-   - mapping config
-   - project generation
-   - validation
-   are all working.
-4. Prefer **testable Python code** over prompt-only logic.
-5. Treat the agent as an orchestrator over deterministic components, not a magical converter.
+2. **Agents are the product.** Every API request flows through the LLM-backed agent orchestrator. The agents reason about each migration and invoke deterministic tools. There is no LLM-free execution path in production.
+3. **Deterministic services are tools, not the pipeline.** Parsing, IR, mapping, transform, and validation are implemented as reliable, testable Python functions. Agents call these functions as tools — the LLM decides when and how to invoke them based on the migration context.
+4. Prefer **testable Python code** for tool implementations. Business logic lives in code, not in prompts — but the LLM orchestrates the overall flow.
+5. **Azure AI Foundry is a hard dependency.** The backend requires a Foundry endpoint and model deployment. Tests use a mock chat client that simulates LLM tool-calling behavior — but the mock exists for testing only, not as an alternative execution mode.
 6. Keep every PR independently reviewable and runnable.
 
 ## Recommended sequence
@@ -128,13 +122,11 @@ repo-root/
 - Package/env management: **uv** exclusively (no pip, poetry, conda)
 - Responsibilities:
   - accept Mule project **or** single flow XML input (dual-mode)
-  - analyze Mule project or individual flow
-  - build IR
-  - run transformation pipeline
-  - run validation
-  - optionally invoke agent orchestration
+  - route all requests through the **agent orchestrator** (LLM-backed)
+  - agents call deterministic tool functions for parsing, IR, transform, validation
   - produce Logic Apps Standard output artifacts (full project or standalone workflow JSON)
   - expose telemetry
+  - manage Foundry client connection lifecycle
 
 ## CLI
 - Language: **TypeScript (latest GA)**
@@ -148,22 +140,27 @@ repo-root/
   - validate local project path **or** single flow XML file path
   - auto-detect input mode (directory → project, .xml file → single-flow)
   - package and submit project or flow to backend
-  - display analysis/progress/results
+  - display analysis/progress/results including agent reasoning summaries
   - write output locally if applicable
   - preserve trace context if possible
 
-## Agent Layer
-- Use **Microsoft Agent Framework**
-- Agents orchestrate deterministic services:
-  - analyzer
-  - planner
-  - transformer
-  - validator
-  - repair adviser
+## Agent Layer (Core)
+- Use **Microsoft Agent Framework** exclusively
+- **The agent layer IS the execution engine.** All API requests flow through it.
+- Five specialized agents, each backed by an LLM and equipped with deterministic tool functions:
+  - **AnalyzerAgent** — parses Mule input, builds IR, validates input structure
+  - **PlannerAgent** — loads mapping config, evaluates construct support, creates migration plan
+  - **TransformerAgent** — validates IR, generates Logic Apps artifacts
+  - **ValidatorAgent** — validates generated output against Logic Apps schema
+  - **RepairAdvisorAgent** — maps validation issues and migration gaps to repair suggestions
+- Agents are composed into a `SequentialBuilder` workflow via `FoundryChatClient`
+- The LLM reasons about each step, calls tools, and produces structured results plus reasoning summaries
+- **Azure AI Foundry connection is required** — `FoundryClientConfig.endpoint` and `model` must be configured
+- Tests use a `MockChatClient` that simulates tool-calling behavior at the LLM interface level
 
 ## Hosting
 - Default: **Azure Container Apps**
-- Use Foundry hosted agents only if later justified by a clear operational or capability benefit.
+- Azure AI Foundry provides the LLM backing for all agent operations.
 
 ---
 
@@ -172,11 +169,11 @@ repo-root/
 ## Phase 0 — Foundations
 Deliver working repo scaffolding, local dev environment, contracts, and CI skeleton.
 
-## Phase 1 — Deterministic Core
-Deliver Mule project parsing, IR creation, mapping config, Logic Apps project generation.
+## Phase 1 — Agent Tools
+Deliver the deterministic tool functions that agents will call: Mule project parsing, IR creation, mapping config, Logic Apps project generation, validation.
 
-## Phase 2 — Agentic Orchestration
-Add Microsoft Agent Framework orchestration around deterministic services.
+## Phase 2 — Agent Orchestration + Integration
+Build agent orchestration with Microsoft Agent Framework. Wire API routes through the agent orchestrator so every request flows through the LLM. Agents call the Phase 1 tool functions. This is when the product starts working end-to-end.
 
 ## Phase 3 — Observability + Hosting
 Instrument everything with OpenTelemetry and deploy to Azure Container Apps.
@@ -1074,6 +1071,185 @@ Document clearly where deterministic logic ends and agent orchestration begins.
 
 ---
 
+## PR-012a — Agent-First Architecture Refactor
+
+### Goal
+Course-correct `services/agents/` to make the LLM the primary execution engine. Remove "offline mode" as a product feature. The orchestrator always flows through the LLM via `SequentialBuilder` — agents reason about each migration and call deterministic tools. There is no LLM-free path in production.
+
+### What's wrong with the current code (PR-012)
+- `MigrationOrchestrator` defaults to "offline mode" where `execute()` calls deterministic services directly — bypassing the LLM entirely
+- `FoundryClientConfig.endpoint` is `Optional[None]` — making the Foundry connection optional
+- "Online mode" runs the LLM *alongside* the deterministic path and staples the LLM response onto `final_output` as `orchestrator_reasoning` — an afterthought
+- The offline path is the real execution path; the LLM is decorative
+- This contradicts the product vision: agents ARE the product, the LLM is required
+
+### Scope
+- **Remove offline mode as a product execution path** in `MigrationOrchestrator`:
+  - Delete `_run_offline()` or repurpose it strictly as test infrastructure (not reachable from production code paths)
+  - The orchestrator's `run()` method always creates a `SequentialBuilder` workflow and executes through the LLM
+  - The LLM calls agent tools, and tool results flow back through the agent conversation
+- **Make `FoundryClientConfig.endpoint` required** (not `Optional[None]`):
+  - `endpoint: str` — must be configured
+  - `model: str = "gpt-4o"` — has sensible default
+  - Remove any code that branches on `endpoint is None`
+- **`MigrationOrchestrator.__init__` requires a chat client**:
+  - `client` parameter is mandatory, not optional
+  - Remove conditional logic that checks for client presence
+- **Structured result extraction from LLM tool calls**:
+  - The orchestrator must extract structured `OrchestrationResult` from the tool call results that flow through the LLM conversation, not from a parallel deterministic run
+  - Each agent's tool function returns JSON; the orchestrator collects these tool outputs into `StepResult` entries
+  - `final_output` contains the real migration artifacts, not a side-channel result
+- **Add `MockChatClient` for tests**:
+  - Simulates LLM tool-calling behavior: receives messages, identifies the tool to call from the agent's tool list, calls it, and returns the tool result as the assistant response
+  - Lives in `services/agents/tests/` (test infrastructure, not shipped)
+  - All 126+ existing tests must be updated to use `MockChatClient` instead of calling `execute()` directly
+- **Enrich system prompts** (`prompts/*.md`):
+  - Since the LLM is now central, prompts should guide the LLM on when/how to use tools, what to report, and how to handle edge cases
+  - Each agent prompt should instruct the LLM to always call its tool and include reasoning with the result
+
+### Acceptance Criteria
+- `MigrationOrchestrator(client=...)` requires a chat client — no fallback to offline mode
+- `FoundryClientConfig.endpoint` is a required `str`, not `Optional`
+- `orchestrator.run()` always executes through the `SequentialBuilder` → LLM → tool calls path
+- `OrchestrationResult` is populated from tool call results flowing through the LLM, not a parallel path
+- `MockChatClient` exists in test infrastructure and simulates tool-calling
+- All existing tests pass using `MockChatClient`
+- No production code path bypasses the LLM
+
+### Prompt for Copilot Coding Agent
+```text
+**Read `docs/mule2logic-cli-spec.md` first. It is the authoritative product spec. If this prompt and the spec conflict, the spec wins.**
+Relevant spec sections: §3 (Architecture — Agent Orchestrator), §10 (Hosting).
+
+Implement PR-012a.
+
+Refactor `services/agents/` to make the LLM the required execution engine. Remove offline mode as a product feature.
+
+**Architecture change:**
+- The agents ARE the product. Every migration request must flow through the LLM-backed agent orchestrator.
+- Deterministic services (parser, IR, transform, validate) remain as tool functions that agents call — but the LLM decides when and how to invoke them.
+
+**Required changes:**
+- `MigrationOrchestrator.__init__` MUST require a `client` parameter (FoundryChatClient or compatible). Remove optional/None handling.
+- `FoundryClientConfig.endpoint` MUST be a required `str`, not `Optional[None]`. Remove any branching on `endpoint is None`.
+- `MigrationOrchestrator.run()` MUST always execute via `SequentialBuilder` workflow through the LLM. Delete or isolate `_run_offline()`.
+- Extract structured `OrchestrationResult` from tool call results that flow through the LLM conversation — not from a parallel deterministic execution.
+- Each agent tool function already returns JSON. The orchestrator should collect these tool call outputs into `StepResult` entries.
+
+**Test infrastructure:**
+- Create `MockChatClient` in `services/agents/tests/` that simulates LLM tool-calling:
+  - Receives messages, identifies which tool to call from the agent's available tools
+  - Calls the tool function directly and returns the result as the assistant response
+  - This is test infrastructure only — not a product feature, not an "offline mode"
+- Update all existing tests to use `MockChatClient` instead of calling `agent.execute()` directly
+- All 126+ tests must continue to pass
+
+**Prompt enrichment:**
+- Update `prompts/*.md` files since the LLM is now central to execution
+- Each prompt should instruct the LLM to always use its tools and include reasoning summaries
+- Prompts should handle edge cases (malformed input, unsupported constructs, partial failures)
+
+Do NOT create an "offline mode", "deterministic mode", "local mode", or any LLM-bypass path. The LLM is required. The only concession is `MockChatClient` for tests.
+```
+
+---
+
+## PR-012b — End-to-End API Integration + API Key Auth
+
+### Goal
+Wire the API routes through the `MigrationOrchestrator` (from PR-012a) so the full pipeline executes end-to-end: CLI → API → agent orchestrator → LLM → tool calls → structured response. Add API key authentication between CLI and backend. Add Foundry connection configuration to the API.
+
+### Scope
+- **API dependencies** — add `m2la-parser`, `m2la-ir`, `m2la-mapping-config`, `m2la-transform`, `m2la-validate`, `m2la-agents` as path dependencies in `apps/api/pyproject.toml`
+- **Foundry client lifecycle** in API:
+  - Add Foundry connection settings to API config (`pydantic-settings`): `M2LA_FOUNDRY_ENDPOINT`, `M2LA_FOUNDRY_MODEL` env vars
+  - Create `FoundryChatClient` on API startup (using UAMI credential via `azure.identity.ManagedIdentityCredential` or `DefaultAzureCredential`)
+  - Expose the client via FastAPI dependency injection so routes can access the orchestrator
+- **Route wiring** — replace placeholder responses in `routes/analyze.py`, `routes/transform.py`, `routes/validate.py`:
+  - Each route creates a `MigrationOrchestrator(client=foundry_client)` and calls `orchestrator.run()`
+  - Map `OrchestrationResult` to contract response models (`AnalyzeResponse`, `TransformResponse`, `ValidationReport`)
+  - Include agent reasoning summaries in responses where the contract supports it
+  - `/analyze` runs orchestrator in analyze-only mode (stop after AnalyzerAgent + PlannerAgent)
+  - `/transform` runs the full pipeline (all 5 agents)
+  - `/validate` runs ValidatorAgent on existing output
+- **API key authentication**:
+  - Backend: add FastAPI dependency that validates `x-api-token` header against `M2LA_API_TOKEN` env var
+  - When `M2LA_API_TOKEN` is set and non-empty, reject requests without a matching header with 401
+  - When `M2LA_API_TOKEN` is unset or empty, skip auth (local dev convenience)
+  - `/health` endpoint remains unauthenticated
+  - CLI: read `M2LA_API_TOKEN` env var (or `--api-token` flag) and send as `x-api-token` header on all requests
+  - If backend returns 401, CLI displays a clear error with remediation hint
+- **Bicep updates**:
+  - Add `M2LA_API_TOKEN` as an env var on the Container App (parameterized, not hardcoded)
+  - Add `M2LA_FOUNDRY_ENDPOINT` and `M2LA_FOUNDRY_MODEL` as env vars on the Container App
+- **Integration tests** — test the full pipeline against sample projects using `MockChatClient` at the API test level
+- **Error handling** — surface agent/LLM errors as structured API error responses (Foundry timeouts, tool failures, etc.)
+
+### API Key Auth Details
+- **Backend env var**: `M2LA_API_TOKEN` — the expected API key value. When set, all requests (except `/health`) must include `x-api-token: <value>`. When unset/empty, auth is disabled (local dev convenience).
+- **CLI env var**: `M2LA_API_TOKEN` — the key to send. CLI reads from env or `--api-token` flag. If the backend returns 401, CLI displays a clear error with remediation hint.
+- **Header name**: `x-api-token`
+- **This is a stopgap.** Future work may replace this with Entra ID / UAMI-based auth for the CLI-to-backend path.
+
+### Acceptance Criteria
+- `POST /analyze` flows through agent orchestrator and returns a real `AnalyzeResponse` with discovered flows, construct counts, gaps, warnings, and agent reasoning
+- `POST /transform` flows through the full 5-agent pipeline and returns a real `TransformResponse` with artifact manifest
+- `POST /validate` flows through ValidatorAgent and returns a real `ValidationReport`
+- Both project mode and single-flow mode work end-to-end
+- API creates `FoundryChatClient` on startup using `M2LA_FOUNDRY_ENDPOINT` + UAMI credential
+- CLI → backend requests include `x-api-token` header when `M2LA_API_TOKEN` is set
+- Backend rejects requests without valid `x-api-token` when `M2LA_API_TOKEN` is configured (401 response)
+- `/health` works without auth
+- Bicep includes `M2LA_API_TOKEN`, `M2LA_FOUNDRY_ENDPOINT`, `M2LA_FOUNDRY_MODEL` as Container App env vars
+- All existing API and CLI tests continue to pass
+- At least 3 integration tests exercise the full roundtrip pipeline (using `MockChatClient`)
+
+### Prompt for Copilot Coding Agent
+```text
+**Read `docs/mule2logic-cli-spec.md` first. It is the authoritative product spec. If this prompt and the spec conflict, the spec wins.**
+Relevant spec sections: §3 (Architecture), §4 (Input Contract), §5 (Output Contract), §8 (Identity).
+
+Implement PR-012b.
+
+Wire the API routes through the MigrationOrchestrator so every request flows through the LLM-backed agent pipeline. Add API key auth and Foundry connection configuration.
+
+**Key principle: there is no hand-rolled pipeline.py that reimplements the agent steps procedurally. The API routes call `MigrationOrchestrator.run()` and the agents handle the rest via LLM tool calls.**
+
+**API integration:**
+- Add ALL service packages + `m2la-agents` as dependencies in `apps/api/pyproject.toml`
+- Add Foundry config to API settings: `M2LA_FOUNDRY_ENDPOINT` (required), `M2LA_FOUNDRY_MODEL` (default: gpt-4o)
+- Create `FoundryChatClient` on API startup using UAMI credential (`DefaultAzureCredential` / `ManagedIdentityCredential`)
+- Expose via FastAPI dependency injection
+- Replace placeholder responses in routes:
+  - `POST /analyze` → `MigrationOrchestrator.run()` (analyze-only: stop after Analyzer + Planner agents)
+  - `POST /transform` → `MigrationOrchestrator.run()` (full 5-agent pipeline)
+  - `POST /validate` → `MigrationOrchestrator.run()` (validator-only)
+- Map `OrchestrationResult` → contract response models
+- Include agent reasoning summaries in responses
+- Handle LLM/Foundry errors gracefully (timeouts, rate limits, tool failures) → structured error responses
+
+**API key authentication:**
+- Backend: FastAPI dependency checking `x-api-token` header against `M2LA_API_TOKEN` env var
+  - When set and non-empty: reject requests without matching header → 401
+  - When unset/empty: skip auth (local dev)
+  - `/health` always unauthenticated
+- CLI: read `M2LA_API_TOKEN` from env or `--api-token` flag, send as `x-api-token` header
+  - On 401: clear error with remediation hint about setting M2LA_API_TOKEN
+
+**Bicep:**
+- Add `M2LA_API_TOKEN`, `M2LA_FOUNDRY_ENDPOINT`, `M2LA_FOUNDRY_MODEL` as Container App env vars (parameterized)
+
+**Tests:**
+- Integration tests using `MockChatClient` from PR-012a
+- Test full pipeline against `packages/sample-projects/hello-world-project/` (project mode) and `packages/sample-projects/standalone-flow.xml` (single-flow mode)
+- Tests for authenticated and unauthenticated request paths
+- All existing tests must pass
+
+This PR makes the platform actually work end-to-end, with agents doing the heavy lifting.
+```
+
+---
+
 ## PR-013 — MCP Tool Integration Abstractions
 
 ### Goal
@@ -1332,7 +1508,8 @@ The MVP is done when all of the following are true:
 
 When reviewing Copilot-generated PRs, verify:
 
-- Is deterministic logic being implemented in code instead of hidden in prompts?
+- Do all API requests flow through the agent orchestrator? There should be no hand-rolled pipeline that bypasses the LLM.
+- Is business logic in testable tool functions (not hidden in prompts)?
 - Are mappings externalized?
 - Is UAMI consistently enforced?
 - Are built-in connectors preferred correctly?
@@ -1342,6 +1519,7 @@ When reviewing Copilot-generated PRs, verify:
 - Is telemetry wired through every major layer?
 - Is the CLI polished without being cluttered?
 - Are tests meaningful and representative?
+- Do tests use `MockChatClient` (not an offline/LLM-bypass path)?
 
 ---
 
@@ -1355,14 +1533,17 @@ You are implementing a production-oriented migration platform.
 Priorities:
 1. correctness
 2. maintainability
-3. deterministic behavior
+3. agent-first architecture — all requests flow through the LLM-backed orchestrator
 4. observability
 5. polished UX
 
 Important rules:
+- **Agents are the product.** All API requests must flow through the `MigrationOrchestrator` and the LLM. Do not create hand-rolled pipelines that bypass agents.
+- Deterministic services (parser, IR, transform, validate) are tool functions that agents call. Business logic lives in tool code, orchestration lives in agents.
+- Do not create "offline mode", "deterministic mode", or any LLM-bypass path. The only exception is `MockChatClient` for tests.
 - Do not collapse the architecture into one oversized module.
 - Keep parsing, IR, transform, validate, agent orchestration, and UI concerns separate.
-- Prefer simple, testable code over clever abstractions.
+- Prefer simple, testable code for tool functions.
 - Favor built-in Logic Apps connectors and identity-based auth.
 - Use User Assigned Managed Identity consistently.
 - Do not introduce secrets into generated artifacts.
@@ -1394,20 +1575,23 @@ Infra and CI/CD land immediately after scaffolding (PR-002) so every subsequent 
 10. PR-009 — Logic Apps project generator
 11. PR-010 — Supported construct transformations
 12. PR-011 — Validation engine
-13. PR-012 — Agent orchestration
-14. PR-013 — MCP tool abstractions
-15. PR-014 — OpenTelemetry instrumentation
-16. PR-015 — UX polish
-17. PR-016 — Expanded connector coverage
-18. PR-017 — Repair suggestions
+13. PR-012 — Agent orchestration (agents + tools + prompts)
+14. **PR-012a — Agent-first architecture refactor** ← removes offline mode, makes LLM required
+15. **PR-012b — End-to-end API integration + API key auth** ← wires routes through agent orchestrator
+16. PR-013 — MCP tool abstractions
+17. PR-014 — OpenTelemetry instrumentation
+18. PR-015 — UX polish
+19. PR-016 — Expanded connector coverage
+20. PR-017 — Repair suggestions
 
 Reason:
 - Infra and CI/CD land immediately after scaffolding so every subsequent PR can be validated, built, and deployed automatically.
 - Each later PR incrementally extends the Bicep modules and pipeline steps as needed.
 - You get a working CLI and API early.
-- You get project parsing and IR before transformation.
-- You get generation and validation before complex agent orchestration.
-- You delay risky agent/tool integration until the deterministic platform already works.
+- You get project parsing and IR before transformation — these become the tool functions agents will call.
+- You get generation and validation before agent orchestration so the tools are stable.
+- PR-012 creates the agents with tools; PR-012a course-corrects to make the LLM the required execution engine; PR-012b wires the API through the orchestrator. After PR-012b lands, the system is fully agentic end-to-end.
+- **PR-012a + PR-012b are the critical integration point** — without them, the API returns placeholder responses and no agent code is reachable from the CLI.
 
 ---
 
