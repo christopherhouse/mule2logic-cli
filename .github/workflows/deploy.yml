@@ -54,6 +54,7 @@ jobs:
       uami-resource-id: ${{ steps.deploy.outputs.uamiResourceId }}
       uami-client-id: ${{ steps.deploy.outputs.uamiClientId }}
       app-insights-conn-string: ${{ steps.deploy.outputs.appInsightsConnectionString }}
+      ai-services-endpoint: ${{ steps.deploy.outputs.aiServicesEndpoint }}
       resource-group: ${{ vars.AZURE_RESOURCE_GROUP_NAME }}
     steps:
       - uses: actions/checkout@v4
@@ -139,6 +140,7 @@ jobs:
           UAMI_RESOURCE_ID: ${{ needs.deploy-infra.outputs.uami-resource-id }}
           UAMI_CLIENT_ID: ${{ needs.deploy-infra.outputs.uami-client-id }}
           APP_INSIGHTS_CONN_STRING: ${{ needs.deploy-infra.outputs.app-insights-conn-string }}
+          AI_SERVICES_ENDPOINT: ${{ needs.deploy-infra.outputs.ai-services-endpoint }}
           CAE_NAME: ${{ needs.deploy-infra.outputs.cae-name }}
         run: |
           chmod +x infra/scripts/deploy-container-app.sh
