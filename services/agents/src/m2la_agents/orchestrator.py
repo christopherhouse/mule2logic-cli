@@ -8,23 +8,19 @@ Pipeline stages:
 4. **Validate**  — validate generated output
 5. **Repair**    — (optional) suggest fixes for issues and gaps
 
-**Online mode** (Microsoft Agent Framework):
-
-Uses ``SequentialBuilder`` from ``agent_framework.orchestrations`` to chain
-agents into a sequential workflow.  Each agent is a MAF ``Agent`` with
-registered tool functions and domain-specific instructions.  The LLM reasons
-about the migration pipeline, invokes tool functions, and produces a coherent
-migration summary.
-
-**Offline mode** (default):
-
-Each step's output is deposited into the shared :class:`AgentContext`.
-If any step returns ``FAILURE``, the pipeline stops.
+All migration requests flow through the LLM-backed agent orchestrator.
+The orchestrator uses ``SequentialBuilder`` from
+``agent_framework.orchestrations`` to chain agents into a sequential
+workflow.  Each agent is a MAF ``Agent`` with registered tool functions
+and domain-specific instructions.  The LLM reasons about each pipeline
+stage, invokes deterministic tool functions, and produces structured
+results.
 """
 
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import time
 import uuid
@@ -35,10 +31,9 @@ from m2la_contracts.enums import InputMode
 
 from m2la_agents.analyzer import AnalyzerAgent
 from m2la_agents.base import BaseAgent
-from m2la_agents.models import AgentContext, AgentResult, AgentStatus, OrchestrationResult, StepResult
+from m2la_agents.models import AgentResult, AgentStatus, OrchestrationResult, StepResult
 from m2la_agents.planner import PlannerAgent
 from m2la_agents.repair_advisor import RepairAdvisorAgent
-from m2la_agents.sdk_config import FoundryClientConfig
 from m2la_agents.transformer import TransformerAgent
 from m2la_agents.validator import ValidatorAgent
 
@@ -47,25 +42,18 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+_MAX_REASONING_SUMMARY_LEN = 200
+
 
 class MigrationOrchestrator:
-    """Runs the full migration pipeline through a sequence of agents.
+    """Runs the full migration pipeline through a sequence of LLM-backed agents.
 
-    Supports two execution modes:
-
-    * **Offline** (default) — each agent's :meth:`~BaseAgent.execute`
-      method is called directly.  No LLM calls or network access.
-    * **Online** — agents are constructed as MAF ``Agent`` instances
-      with a ``FoundryChatClient``, then composed into a
-      ``SequentialBuilder`` workflow for multi-agent orchestration.
+    Every migration request flows through the LLM via a
+    ``SequentialBuilder`` workflow.  The ``client`` parameter (a
+    ``FoundryChatClient`` or compatible) is **required**.
 
     Usage::
 
-        # Offline (tests / CI)
-        orchestrator = MigrationOrchestrator()
-        result = orchestrator.run(input_path="/path/to/mule-project")
-
-        # Online (with Azure AI Foundry)
         from agent_framework.foundry import FoundryChatClient
         from azure.identity import AzureCliCredential
 
@@ -74,8 +62,7 @@ class MigrationOrchestrator:
             model="gpt-4o",
             credential=AzureCliCredential(),
         )
-        config = FoundryClientConfig(endpoint="https://...", model="gpt-4o")
-        orchestrator = MigrationOrchestrator(client=client, config=config)
+        orchestrator = MigrationOrchestrator(client=client)
         result = orchestrator.run(input_path="/path/to/mule-project")
     """
 
@@ -84,8 +71,7 @@ class MigrationOrchestrator:
         *,
         agents: list[BaseAgent] | None = None,
         include_repair: bool = True,
-        client: Any | None = None,
-        config: FoundryClientConfig | None = None,
+        client: Any,
     ) -> None:
         if agents is not None:
             self.agents = agents
@@ -101,7 +87,6 @@ class MigrationOrchestrator:
             self.agents = base
         self.include_repair = include_repair
         self.client = client
-        self.config = config or FoundryClientConfig()
 
     def run(
         self,
@@ -114,79 +99,38 @@ class MigrationOrchestrator:
         span_id: str = "",
         metadata: dict | None = None,
     ) -> OrchestrationResult:
-        """Execute the full migration pipeline.
+        """Execute the full migration pipeline through the LLM.
 
-        Selects online or offline mode based on whether a chat client
-        was provided.
-        """
-        if self.client is not None:
-            return self._run_online(
-                input_path,
-                input_mode=input_mode,
-                output_directory=output_directory,
-                correlation_id=correlation_id,
-                trace_id=trace_id,
-                span_id=span_id,
-                metadata=metadata,
-            )
-        return self._run_offline(
-            input_path,
-            input_mode=input_mode,
-            output_directory=output_directory,
-            correlation_id=correlation_id,
-            trace_id=trace_id,
-            span_id=span_id,
-            metadata=metadata,
-        )
-
-    # ------------------------------------------------------------------
-    # Online mode — Microsoft Agent Framework SequentialBuilder
-    # ------------------------------------------------------------------
-
-    def _run_online(
-        self,
-        input_path: str,
-        *,
-        input_mode: InputMode | None = None,
-        output_directory: str | None = None,
-        correlation_id: str | None = None,
-        trace_id: str = "",
-        span_id: str = "",
-        metadata: dict | None = None,
-    ) -> OrchestrationResult:
-        """Run using the Microsoft Agent Framework with SequentialBuilder.
-
-        1. Build MAF ``Agent`` instances from each sub-agent.
-        2. Compose them into a ``SequentialBuilder`` workflow.
-        3. Run the workflow with a user message describing the task.
-        4. Also run the deterministic offline path for structured results.
+        Always flows through the ``SequentialBuilder`` → LLM → tool
+        calls path.  There is no offline bypass.
         """
         cid = correlation_id or str(uuid.uuid4())
         pipeline_start = time.monotonic()
 
-        context = AgentContext(
-            correlation_id=cid,
-            trace_id=trace_id,
-            span_id=span_id,
-            input_mode=input_mode,
-            input_path=input_path,
-            output_directory=output_directory,
-            metadata=metadata or {},
-        )
+        # Handle empty agent list early
+        if not self.agents:
+            total_ms = (time.monotonic() - pipeline_start) * 1000
+            return OrchestrationResult(
+                correlation_id=cid,
+                steps=[],
+                overall_status=AgentStatus.SUCCESS,
+                total_duration_ms=total_ms,
+                final_output=None,
+            )
 
-        # Step 1: Build MAF agents from our BaseAgent wrappers
+        # Build MAF agents from our BaseAgent wrappers
         maf_agents: list[Agent] = []
         for agent in self.agents:
             maf_agent = agent.build_maf_agent(self.client)
             maf_agents.append(maf_agent)
             logger.info("Built MAF agent: %s", agent.name)
 
-        # Step 2: Build SequentialBuilder workflow
+        # Build SequentialBuilder workflow
         from agent_framework.orchestrations import SequentialBuilder
 
         workflow = SequentialBuilder(participants=maf_agents).build()
 
-        # Step 3: Run the workflow with a migration request message
+        # Construct user message describing the migration task
         mode_str = input_mode.value if input_mode else "auto-detect"
         user_message = (
             f"Migrate the MuleSoft project at: {input_path}\n"
@@ -195,7 +139,8 @@ class MigrationOrchestrator:
             f"Correlation ID: {cid}"
         )
 
-        orchestrator_response = ""
+        # Execute the workflow
+        step_results: list[StepResult] = []
         try:
             try:
                 asyncio.get_running_loop()
@@ -203,141 +148,127 @@ class MigrationOrchestrator:
                 pass  # No running loop — safe to use asyncio.run()
             else:
                 msg = (
-                    "MigrationOrchestrator.run() cannot execute online mode from a running event loop. "
-                    "Use an async orchestration entry point for online execution instead."
+                    "MigrationOrchestrator.run() cannot execute from a running event loop. "
+                    "Use an async orchestration entry point instead."
                 )
                 logger.error(msg)
                 raise RuntimeError(msg)
 
-            orchestrator_response = asyncio.run(self._execute_workflow(workflow, user_message))
-            logger.info("Workflow completed with response length: %d", len(orchestrator_response))
-        except RuntimeError:
-            raise  # Propagate loop-detection error; do not swallow as a workflow failure
-        except Exception:
-            logger.warning("Online workflow execution failed, using offline results only", exc_info=True)
-
-        # Step 4: Run deterministic path for structured AgentResult objects
-        steps: list[StepResult] = []
-        overall_status = AgentStatus.SUCCESS
-        final_output = None
-
-        for agent in self.agents:
-            step_start = datetime.now(UTC)
-            result: AgentResult = agent.execute(context)
-            step_end = datetime.now(UTC)
-
-            step = StepResult(
-                step_name=agent.name,
-                agent_result=result,
-                started_at=step_start,
-                completed_at=step_end,
+            step_results = asyncio.run(
+                self._execute_workflow(workflow, user_message),
             )
-            steps.append(step)
+            logger.info("Workflow completed with %d step(s)", len(step_results))
+        except RuntimeError:
+            raise  # Propagate loop-detection error
+        except Exception:
+            logger.exception("Workflow execution failed")
 
-            if result.status == AgentStatus.FAILURE:
+        # Derive overall status from step results
+        overall_status = AgentStatus.SUCCESS
+        final_output: Any = None
+
+        for step in step_results:
+            if step.agent_result.status == AgentStatus.FAILURE:
                 overall_status = AgentStatus.FAILURE
                 break
-            if result.status == AgentStatus.PARTIAL:
+            if step.agent_result.status == AgentStatus.PARTIAL:
                 overall_status = AgentStatus.PARTIAL
-            final_output = result.output
-
-        # Attach the LLM's reasoning
-        if orchestrator_response:
-            if isinstance(final_output, dict):
-                final_output["orchestrator_reasoning"] = orchestrator_response
-            else:
-                final_output = {
-                    "result": final_output,
-                    "orchestrator_reasoning": orchestrator_response,
-                }
+            final_output = step.agent_result.output
 
         total_ms = (time.monotonic() - pipeline_start) * 1000
 
         return OrchestrationResult(
             correlation_id=cid,
-            steps=steps,
+            steps=step_results,
             overall_status=overall_status,
             total_duration_ms=total_ms,
             final_output=final_output,
         )
 
-    @staticmethod
-    async def _execute_workflow(workflow: Any, user_message: str) -> str:
-        """Run the SequentialBuilder workflow and extract the final response."""
-        outputs: list[list[Any]] = []
+    # ------------------------------------------------------------------
+    # Workflow execution
+    # ------------------------------------------------------------------
+
+    async def _execute_workflow(
+        self,
+        workflow: Any,
+        user_message: str,
+    ) -> list[StepResult]:
+        """Run the SequentialBuilder workflow and extract step results.
+
+        Each agent in the sequential workflow calls a tool function and
+        returns the result as assistant text.  The final ``output`` event
+        contains the full conversation with one assistant message per
+        agent.  We parse those messages into :class:`StepResult` entries.
+        """
+        final_conversation: list[Any] = []
+
         async for event in workflow.run(user_message, stream=True):
             if event.type == "output":
-                outputs.append(event.data)
+                final_conversation = event.data if event.data else []
 
-        if outputs:
-            last_conversation = outputs[-1]
-            # Get the last assistant message
-            for msg in reversed(last_conversation):
-                if msg.role == "assistant" and msg.text:
-                    return msg.text
-        return ""
+        return self._parse_conversation_steps(final_conversation)
 
-    # ------------------------------------------------------------------
-    # Offline mode — deterministic logic only
-    # ------------------------------------------------------------------
-
-    def _run_offline(
+    def _parse_conversation_steps(
         self,
-        input_path: str,
-        *,
-        input_mode: InputMode | None = None,
-        output_directory: str | None = None,
-        correlation_id: str | None = None,
-        trace_id: str = "",
-        span_id: str = "",
-        metadata: dict | None = None,
-    ) -> OrchestrationResult:
-        """Run in offline mode — deterministic logic only."""
-        cid = correlation_id or str(uuid.uuid4())
-        pipeline_start = time.monotonic()
+        conversation: list[Any],
+    ) -> list[StepResult]:
+        """Parse the final conversation into StepResult entries.
 
-        context = AgentContext(
-            correlation_id=cid,
-            trace_id=trace_id,
-            span_id=span_id,
-            input_mode=input_mode,
-            input_path=input_path,
-            output_directory=output_directory,
-            metadata=metadata or {},
-        )
-
+        Each assistant message in the conversation corresponds to one
+        agent's tool output.  We match them to our ``self.agents`` list
+        by position.
+        """
+        now = datetime.now(UTC)
         steps: list[StepResult] = []
-        overall_status = AgentStatus.SUCCESS
-        final_output = None
+        agent_idx = 0
 
-        for agent in self.agents:
-            step_start = datetime.now(UTC)
-            result: AgentResult = agent.execute(context)
-            step_end = datetime.now(UTC)
+        for msg in conversation:
+            role = getattr(msg, "role", "")
+            if role != "assistant":
+                continue
 
-            step = StepResult(
-                step_name=agent.name,
-                agent_result=result,
-                started_at=step_start,
-                completed_at=step_end,
+            text = getattr(msg, "text", "") or ""
+            agent_name = self.agents[agent_idx].name if agent_idx < len(self.agents) else f"Agent-{agent_idx}"
+            agent_idx += 1
+
+            # Try to parse the tool output as JSON
+            output: Any = None
+            status = AgentStatus.SUCCESS
+            error_message: str | None = None
+
+            try:
+                parsed = json.loads(text)
+                output = parsed
+
+                # Check for failure indicators in the tool output
+                if isinstance(parsed, dict):
+                    if "error" in parsed:
+                        status = AgentStatus.FAILURE
+                        error_message = str(parsed["error"])
+                    elif parsed.get("valid") is False:
+                        status = AgentStatus.PARTIAL
+            except (json.JSONDecodeError, TypeError):
+                output = text if text else None
+
+            agent_result = AgentResult(
+                agent_name=agent_name,
+                status=status,
+                output=output,
+                reasoning_summary=text[:_MAX_REASONING_SUMMARY_LEN] if text else f"{agent_name} completed",
+                error_message=error_message,
             )
-            steps.append(step)
+            steps.append(
+                StepResult(
+                    step_name=agent_name,
+                    agent_result=agent_result,
+                    started_at=now,
+                    completed_at=now,
+                )
+            )
 
-            if result.status == AgentStatus.FAILURE:
-                overall_status = AgentStatus.FAILURE
+            # Stop pipeline on failure
+            if status == AgentStatus.FAILURE:
                 break
 
-            if result.status == AgentStatus.PARTIAL:
-                overall_status = AgentStatus.PARTIAL
-
-            final_output = result.output
-
-        total_ms = (time.monotonic() - pipeline_start) * 1000
-
-        return OrchestrationResult(
-            correlation_id=cid,
-            steps=steps,
-            overall_status=overall_status,
-            total_duration_ms=total_ms,
-            final_output=final_output,
-        )
+        return steps

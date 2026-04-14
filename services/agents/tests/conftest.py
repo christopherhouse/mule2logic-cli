@@ -9,6 +9,8 @@ import pytest
 
 from m2la_agents.models import AgentContext
 
+from .mock_chat_client import MockChatClient
+
 # Locate sample-projects relative to *this* test file so the suite works
 # regardless of the working directory used when invoking pytest.
 _SAMPLES_DIR = Path(__file__).resolve().parent.parent.parent.parent / "packages" / "sample-projects"
@@ -56,6 +58,17 @@ def empty_flow_xml(sample_projects_dir: Path) -> Path:
     xml = sample_projects_dir / "empty-flow.xml"
     assert xml.is_file(), f"empty-flow.xml not found: {xml}"
     return xml
+
+
+# ---------------------------------------------------------------------------
+# Mock chat client fixture
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture()
+def mock_client() -> MockChatClient:
+    """Return a fresh :class:`MockChatClient` for tests that need a chat client."""
+    return MockChatClient()
 
 
 # ---------------------------------------------------------------------------

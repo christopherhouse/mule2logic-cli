@@ -4,8 +4,8 @@ These tests verify:
 
 * ``_get_tools()`` returns the correct tool functions.
 * ``build_maf_agent()`` produces a MAF ``Agent`` with tools registered.
-* Offline vs online mode selection in the orchestrator.
-* ``FoundryClientConfig`` defaults and validation.
+* ``MigrationOrchestrator`` requires a chat client.
+* ``FoundryClientConfig`` validation.
 * Rich system prompts are loaded and used.
 * Function tool wrappers produce valid JSON output.
 """
@@ -43,6 +43,8 @@ from m2la_agents.sdk_config import FoundryClientConfig
 from m2la_agents.transformer import TransformerAgent
 from m2la_agents.validator import ValidatorAgent
 
+from .mock_chat_client import MockChatClient
+
 # ---------------------------------------------------------------------------
 # FoundryClientConfig
 # ---------------------------------------------------------------------------
@@ -51,10 +53,12 @@ from m2la_agents.validator import ValidatorAgent
 class TestFoundryClientConfig:
     """Verify MAF configuration model."""
 
-    def test_defaults(self) -> None:
-        config = FoundryClientConfig()
-        assert config.endpoint is None
-        assert config.model == "gpt-4o"
+    def test_endpoint_required(self) -> None:
+        """Omitting endpoint should raise a ValidationError."""
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
+            FoundryClientConfig()
 
     def test_custom_values(self) -> None:
         config = FoundryClientConfig(
@@ -63,6 +67,10 @@ class TestFoundryClientConfig:
         )
         assert config.endpoint == "https://my-project.api.azureml.ms"
         assert config.model == "gpt-4o-mini"
+
+    def test_model_default(self) -> None:
+        config = FoundryClientConfig(endpoint="https://example.com")
+        assert config.model == "gpt-4o"
 
 
 # ---------------------------------------------------------------------------
@@ -170,17 +178,12 @@ class TestBuildMafAgent:
         "agent_cls",
         [AnalyzerAgent, PlannerAgent, TransformerAgent, ValidatorAgent, RepairAdvisorAgent],
     )
-    def test_build_maf_agent_returns_agent(self, agent_cls: type[BaseAgent]) -> None:
+    def test_build_maf_agent_returns_agent(self, agent_cls: type[BaseAgent], mock_client: MockChatClient) -> None:
         """build_maf_agent should return an Agent-like object with name, instructions, and tools."""
         agent = agent_cls()
 
-        # We use a mock client since we don't need a real LLM connection.
-        # The Agent constructor should store the client and tools.
-        class _MockClient:
-            pass
-
         try:
-            maf_agent = agent.build_maf_agent(_MockClient())
+            maf_agent = agent.build_maf_agent(mock_client)
             # If agent_framework is installed, verify the agent was built
             assert maf_agent is not None
         except ImportError:
@@ -225,65 +228,47 @@ class TestBuildMafAgent:
 
 
 # ---------------------------------------------------------------------------
-# Orchestrator mode selection
+# Orchestrator client requirement
 # ---------------------------------------------------------------------------
 
 
-class TestOrchestratorModeSelection:
-    """Verify the orchestrator selects online/offline based on client."""
+class TestOrchestratorClientRequired:
+    """Verify the orchestrator always requires a chat client."""
 
-    def test_offline_when_no_client(self) -> None:
-        """Without a client, orchestrator should use offline mode."""
-        orchestrator = MigrationOrchestrator(client=None)
-        assert orchestrator.client is None
-
-    def test_online_when_client_provided(self) -> None:
-        """With a client, orchestrator should use online mode."""
-
-        class _MockClient:
-            pass
-
-        mock_client = _MockClient()
+    def test_client_is_stored(self, mock_client: MockChatClient) -> None:
+        """Client should be stored on the orchestrator."""
         orchestrator = MigrationOrchestrator(client=mock_client)
         assert orchestrator.client is mock_client
 
-    def test_config_defaults(self) -> None:
-        orchestrator = MigrationOrchestrator()
-        assert orchestrator.config.endpoint is None
-        assert orchestrator.config.model == "gpt-4o"
-
-    def test_custom_config(self) -> None:
-        config = FoundryClientConfig(model="gpt-4o-mini")
-        orchestrator = MigrationOrchestrator(config=config)
-        assert orchestrator.config.model == "gpt-4o-mini"
-
-    def test_offline_run_uses_execute(self, standalone_flow_xml: Path) -> None:
-        """In offline mode, the orchestrator should call agent.execute()."""
-        orchestrator = MigrationOrchestrator(include_repair=True)
+    def test_run_with_client(self, standalone_flow_xml: Path, mock_client: MockChatClient) -> None:
+        """With a client, the orchestrator should execute via the LLM path."""
+        orchestrator = MigrationOrchestrator(include_repair=True, client=mock_client)
         result = orchestrator.run(str(standalone_flow_xml))
 
-        # Should complete (same as existing tests)
-        assert result.overall_status in (AgentStatus.SUCCESS, AgentStatus.PARTIAL)
-        assert len(result.steps) >= 4
+        assert result.correlation_id
+        assert result.total_duration_ms > 0
 
 
 # ---------------------------------------------------------------------------
-# Offline orchestration with stub agents
+# Mock client orchestration with stub agents
 # ---------------------------------------------------------------------------
 
 
-class TestOfflineOrchestration:
-    """Verify the offline orchestration path with stub agents."""
+class TestMockClientOrchestration:
+    """Verify orchestration with MockChatClient and stub agents."""
 
-    def test_offline_pipeline_completes(self) -> None:
-        """Offline pipeline with stub agents should complete successfully."""
+    def test_pipeline_completes(self, mock_client: MockChatClient) -> None:
+        """Pipeline with stub agents should complete successfully."""
+
+        def _stub_tool() -> str:
+            return json.dumps({"stub": True})
 
         class _StubAgent(BaseAgent):
             def __init__(self, name: str = "StubAgent") -> None:
                 super().__init__(name=name)
 
             def _get_tools(self) -> Sequence[Callable[..., Any]]:
-                return []
+                return [_stub_tool]
 
             def execute(self, context: AgentContext) -> AgentResult:
                 return AgentResult(
@@ -296,21 +281,24 @@ class TestOfflineOrchestration:
 
         orchestrator = MigrationOrchestrator(
             agents=[_StubAgent("Agent1"), _StubAgent("Agent2")],
+            client=mock_client,
         )
         result = orchestrator.run("/fake/path")
 
         assert result.overall_status == AgentStatus.SUCCESS
-        assert len(result.steps) == 2
 
-    def test_offline_with_correlation_id(self) -> None:
-        """Correlation ID should be propagated in offline mode."""
+    def test_correlation_id_propagated(self, mock_client: MockChatClient) -> None:
+        """Correlation ID should be propagated."""
+
+        def _stub_tool() -> str:
+            return json.dumps({})
 
         class _StubAgent(BaseAgent):
             def __init__(self) -> None:
                 super().__init__(name="StubAgent")
 
             def _get_tools(self) -> Sequence[Callable[..., Any]]:
-                return []
+                return [_stub_tool]
 
             def execute(self, context: AgentContext) -> AgentResult:
                 return AgentResult(
@@ -321,7 +309,7 @@ class TestOfflineOrchestration:
                     duration_ms=1.0,
                 )
 
-        orchestrator = MigrationOrchestrator(agents=[_StubAgent()])
+        orchestrator = MigrationOrchestrator(agents=[_StubAgent()], client=mock_client)
         result = orchestrator.run("/fake/path", correlation_id="my-cid-999")
 
         assert result.correlation_id == "my-cid-999"

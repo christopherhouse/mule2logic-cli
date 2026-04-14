@@ -42,6 +42,10 @@ var defaultTags = union(tags, {
 
 var uamiName = 'id-m2la-${environmentName}'
 
+// Generate a stable, deterministic API key from resource group ID + project name + environment.
+// POC only — will be replaced with Entra authentication.
+var pocApiKey = '${uniqueString(resourceGroup().id, 'mule2logic-api-key', environmentName)}${uniqueString(subscription().subscriptionId, 'mule2logic', environmentName)}'
+
 // ---------------------------------------------------------------------------
 // Module: Identity (UAMI)
 // ---------------------------------------------------------------------------
@@ -152,3 +156,7 @@ output aiServicesEndpoint string = aiFoundry.outputs.endpoint
 
 @description('AI Services system-assigned identity principal ID.')
 output aiServicesPrincipalId string = aiFoundry.outputs.principalId
+
+// Authentication (POC)
+@description('Deterministic API key for POC authentication. Will be replaced with Entra auth.')
+output apiKey string = pocApiKey

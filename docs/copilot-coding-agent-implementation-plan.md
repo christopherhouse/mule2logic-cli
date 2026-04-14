@@ -1071,7 +1071,7 @@ Document clearly where deterministic logic ends and agent orchestration begins.
 
 ---
 
-## PR-012a — Agent-First Architecture Refactor
+## PR-012a — Agent-First Architecture Refactor ✅ COMPLETE
 
 ### Goal
 Course-correct `services/agents/` to make the LLM the primary execution engine. Remove "offline mode" as a product feature. The orchestrator always flows through the LLM via `SequentialBuilder` — agents reason about each migration and call deterministic tools. There is no LLM-free path in production.
@@ -1151,6 +1151,14 @@ Refactor `services/agents/` to make the LLM the required execution engine. Remov
 
 Do NOT create an "offline mode", "deterministic mode", "local mode", or any LLM-bypass path. The LLM is required. The only concession is `MockChatClient` for tests.
 ```
+
+### Completion Note (2026-04-14)
+- **All acceptance criteria met.** `MigrationOrchestrator` requires `client`, `FoundryClientConfig.endpoint` is required, `_run_offline()` deleted, pipeline always flows through `SequentialBuilder`.
+- **MockChatClient** directly invokes tool functions (not via `FunctionInvocationLayer` middleware, which requires `BaseChatClient` subclass). This is simpler and more reliable for testing.
+- **124 agent tests pass** (was 126; net -2 due to removed offline/mode-selection tests replaced by new client-required tests).
+- **Prompt enrichment** completed for all 6 prompt files with always-use-tools instructions, edge case handling, reasoning summaries.
+- **Bonus: POC API key auth** added (requested during implementation): Bicep `uniqueString()` output → deploy script → FastAPI middleware. 33 API tests pass (26 original + 7 new).
+- **Deviation:** Individual agent tests (`test_analyzer.py`, `test_planner.py`, etc.) continue to call `execute()` directly — these test the tool function implementations, not orchestration. Restructuring them to use `MockChatClient` was deemed excessive per the plan.
 
 ---
 
