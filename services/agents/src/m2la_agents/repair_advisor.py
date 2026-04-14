@@ -96,10 +96,17 @@ class RepairAdvisorAgent(BaseAgent):
         )
 
     def _get_tools(self) -> Sequence[Callable[..., Any]]:
-        """Return the ``suggest_repairs`` function as a tool."""
-        from m2la_agents.function_tools import suggest_repairs
+        """Return repair and grounding tool functions.
 
-        return [suggest_repairs]
+        The repair advisor has access to:
+        - ``suggest_repairs`` — deterministic repair suggestion
+        - ``search_logic_apps_docs`` — Microsoft Learn grounding
+        - ``search_mulesoft_docs`` — Context7 MuleSoft grounding
+        """
+        from m2la_agents.function_tools import suggest_repairs
+        from m2la_agents.grounding.tool_functions import search_logic_apps_docs, search_mulesoft_docs
+
+        return [suggest_repairs, search_logic_apps_docs, search_mulesoft_docs]
 
     def execute(self, context: AgentContext) -> AgentResult:
         """Analyze issues and produce repair suggestions.

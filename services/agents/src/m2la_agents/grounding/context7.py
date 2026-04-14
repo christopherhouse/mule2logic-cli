@@ -73,17 +73,11 @@ class Context7Client:
                 f"Context7 library search timed out after {self._timeout}s for query: {query!r}"
             ) from exc
         except httpx.ConnectError as exc:
-            raise GroundingConnectionError(
-                f"Failed to connect to Context7 for query: {query!r}"
-            ) from exc
+            raise GroundingConnectionError(f"Failed to connect to Context7 for query: {query!r}") from exc
         except httpx.HTTPStatusError as exc:
-            raise GroundingError(
-                f"Context7 returned HTTP {exc.response.status_code} for query: {query!r}"
-            ) from exc
+            raise GroundingError(f"Context7 returned HTTP {exc.response.status_code} for query: {query!r}") from exc
         except httpx.HTTPError as exc:
-            raise GroundingError(
-                f"Context7 library search failed for query: {query!r}: {exc}"
-            ) from exc
+            raise GroundingError(f"Context7 library search failed for query: {query!r}: {exc}") from exc
 
         elapsed_ms = (time.monotonic() - start) * 1000
         data: dict[str, Any] = resp.json()
@@ -137,17 +131,11 @@ class Context7Client:
                 f"Context7 doc fetch timed out after {self._timeout}s for query: {query!r}"
             ) from exc
         except httpx.ConnectError as exc:
-            raise GroundingConnectionError(
-                f"Failed to connect to Context7 for query: {query!r}"
-            ) from exc
+            raise GroundingConnectionError(f"Failed to connect to Context7 for query: {query!r}") from exc
         except httpx.HTTPStatusError as exc:
-            raise GroundingError(
-                f"Context7 returned HTTP {exc.response.status_code} for query: {query!r}"
-            ) from exc
+            raise GroundingError(f"Context7 returned HTTP {exc.response.status_code} for query: {query!r}") from exc
         except httpx.HTTPError as exc:
-            raise GroundingError(
-                f"Context7 doc fetch failed for query: {query!r}: {exc}"
-            ) from exc
+            raise GroundingError(f"Context7 doc fetch failed for query: {query!r}: {exc}") from exc
 
         elapsed_ms = (time.monotonic() - start) * 1000
         content = resp.text

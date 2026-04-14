@@ -67,17 +67,13 @@ class MicrosoftLearnClient:
                 f"Microsoft Learn search timed out after {self._timeout}s for query: {query!r}"
             ) from exc
         except httpx.ConnectError as exc:
-            raise GroundingConnectionError(
-                f"Failed to connect to Microsoft Learn for query: {query!r}"
-            ) from exc
+            raise GroundingConnectionError(f"Failed to connect to Microsoft Learn for query: {query!r}") from exc
         except httpx.HTTPStatusError as exc:
             raise GroundingError(
                 f"Microsoft Learn returned HTTP {exc.response.status_code} for query: {query!r}"
             ) from exc
         except httpx.HTTPError as exc:
-            raise GroundingError(
-                f"Microsoft Learn request failed for query: {query!r}: {exc}"
-            ) from exc
+            raise GroundingError(f"Microsoft Learn request failed for query: {query!r}: {exc}") from exc
 
         elapsed_ms = (time.monotonic() - start) * 1000
         data: dict[str, Any] = resp.json()
@@ -115,17 +111,11 @@ class MicrosoftLearnClient:
                 f"Microsoft Learn page fetch timed out after {self._timeout}s for url: {url}"
             ) from exc
         except httpx.ConnectError as exc:
-            raise GroundingConnectionError(
-                f"Failed to connect to Microsoft Learn for url: {url}"
-            ) from exc
+            raise GroundingConnectionError(f"Failed to connect to Microsoft Learn for url: {url}") from exc
         except httpx.HTTPStatusError as exc:
-            raise GroundingError(
-                f"Microsoft Learn returned HTTP {exc.response.status_code} for url: {url}"
-            ) from exc
+            raise GroundingError(f"Microsoft Learn returned HTTP {exc.response.status_code} for url: {url}") from exc
         except httpx.HTTPError as exc:
-            raise GroundingError(
-                f"Microsoft Learn page fetch failed for url: {url}: {exc}"
-            ) from exc
+            raise GroundingError(f"Microsoft Learn page fetch failed for url: {url}: {exc}") from exc
 
         elapsed_ms = (time.monotonic() - start) * 1000
         content = resp.text

@@ -49,10 +49,22 @@ class TransformerAgent(BaseAgent):
         )
 
     def _get_tools(self) -> Sequence[Callable[..., Any]]:
-        """Return the ``transform_to_logic_apps`` function as a tool."""
-        from m2la_agents.function_tools import transform_to_logic_apps
+        """Return transformation and grounding tool functions.
 
-        return [transform_to_logic_apps]
+        The transformer has access to:
+        - ``transform_to_logic_apps`` — deterministic artifact generation
+        - ``search_logic_apps_docs`` — Microsoft Learn grounding
+        - ``fetch_logic_apps_doc`` — fetch specific Microsoft Learn pages
+        - ``search_mulesoft_docs`` — Context7 MuleSoft grounding
+        """
+        from m2la_agents.function_tools import transform_to_logic_apps
+        from m2la_agents.grounding.tool_functions import (
+            fetch_logic_apps_doc,
+            search_logic_apps_docs,
+            search_mulesoft_docs,
+        )
+
+        return [transform_to_logic_apps, search_logic_apps_docs, fetch_logic_apps_doc, search_mulesoft_docs]
 
     def execute(self, context: AgentContext) -> AgentResult:
         """Validate the IR and generate Logic Apps artifacts.
