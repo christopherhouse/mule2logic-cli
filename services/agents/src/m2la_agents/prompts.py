@@ -30,6 +30,7 @@ def load_prompt(name: str) -> str:
 
 # Convenience accessors — each reads its ``.md`` file once.
 
+
 def orchestrator_prompt() -> str:
     return _load("orchestrator")
 
@@ -52,4 +53,3 @@ def validator_prompt() -> str:
 
 def repair_advisor_prompt() -> str:
     return _load("repair_advisor")
-

@@ -15,7 +15,8 @@ The base class provides helpers for constructing a MAF ``Agent``
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Callable, Sequence
+from collections.abc import Callable, Sequence
+from typing import TYPE_CHECKING, Any
 
 from m2la_agents.models import AgentContext, AgentResult
 
