@@ -7,17 +7,25 @@ Includes both unit tests (mocked services) and integration tests
 from __future__ import annotations
 
 import json
-from collections.abc import AsyncIterable, Callable, Sequence
-from typing import Any
+from collections.abc import AsyncIterable, Callable, Mapping, Sequence
 from pathlib import Path
+from typing import Any
+from unittest.mock import patch
 
 import pytest
-from agent_framework import ChatResponse, ChatResponseUpdate, Content, Message
+from agent_framework import ChatResponse, ChatResponseUpdate, Message
 from agent_framework._types import ResponseStream
+from agent_framework.exceptions import ChatClientException
 
 from m2la_agents.base import BaseAgent
 from m2la_agents.models import AgentContext, AgentResult, AgentStatus
-from m2la_agents.orchestrator import MigrationOrchestrator
+from m2la_agents.orchestrator import (
+    _DEFAULT_MAX_RETRIES,
+    _RETRY_MAX_DELAY_S,
+    MigrationOrchestrator,
+    _is_retryable_error,
+    _retry_delay,
+)
 
 from .mock_chat_client import MockChatClient
 
@@ -411,3 +419,286 @@ class TestOrchestratorExceptionPropagation:
 
         with pytest.raises(ValueError, match="Unexpected workflow error"):
             orchestrator.run("/fake/path")
+
+
+# ---------------------------------------------------------------------------
+# Retry infrastructure
+# ---------------------------------------------------------------------------
+
+
+class _RetryableChatClient:
+    """A mock chat client that raises ``ChatClientException`` a configurable
+    number of times, then succeeds with a normal response.
+
+    Used to test the retry logic in the orchestrator.
+    """
+
+    additional_properties: dict[str, Any]
+
+    def __init__(
+        self,
+        *,
+        failures: int = 1,
+        error_message: str = (
+            "service failed to complete the prompt: Error code: 400 - "
+            "{'error': {'message': 'No tool call found for function call "
+            "output with call_id call_abc123.'}}"
+        ),
+    ) -> None:
+        self.additional_properties = {}
+        self._failures_remaining = failures
+        self._error_message = error_message
+        self.call_count = 0
+
+    def get_response(
+        self,
+        messages: Sequence[Message],
+        *,
+        stream: bool = False,
+        options: Any | None = None,
+        compaction_strategy: Any | None = None,
+        tokenizer: Any | None = None,
+        function_invocation_kwargs: Mapping[str, Any] | None = None,
+        client_kwargs: Mapping[str, Any] | None = None,
+    ) -> Any:
+        self.call_count += 1
+
+        if self._failures_remaining > 0:
+            self._failures_remaining -= 1
+            if stream:
+                return self._as_error_stream()
+            return self._as_error_awaitable()
+
+        # Succeed with a normal tool-call response
+        return MockChatClient().get_response(
+            messages,
+            stream=stream,
+            options=options,
+            compaction_strategy=compaction_strategy,
+            tokenizer=tokenizer,
+            function_invocation_kwargs=function_invocation_kwargs,
+            client_kwargs=client_kwargs,
+        )
+
+    def _as_error_awaitable(self) -> Any:
+        error = ChatClientException(self._error_message)
+
+        async def _coro() -> ChatResponse[Any]:
+            raise error
+
+        return _coro()
+
+    def _as_error_stream(self) -> ResponseStream[ChatResponseUpdate, ChatResponse[Any]]:
+        error = ChatClientException(self._error_message)
+
+        async def _stream() -> AsyncIterable[ChatResponseUpdate]:
+            raise error
+            yield  # type: ignore[misc]  # make it a generator
+
+        response = ChatResponse(
+            messages=[Message(role="assistant", contents=["error"])],
+            response_id="error",
+            finish_reason="stop",
+        )
+        return ResponseStream(
+            _stream(),
+            finalizer=lambda _updates: response,
+        )
+
+
+# ---------------------------------------------------------------------------
+# Retry helper tests
+# ---------------------------------------------------------------------------
+
+
+class TestIsRetryableError:
+    """Test the ``_is_retryable_error`` classification function."""
+
+    def test_tool_call_not_found_error(self) -> None:
+        exc = ChatClientException(
+            "service failed to complete the prompt: Error code: 400 - "
+            "{'error': {'message': 'No tool call found for function call "
+            "output with call_id call_0oa0KeOXuv5kIKq2foIgKAq9.'}}"
+        )
+        assert _is_retryable_error(exc) is True
+
+    def test_rate_limit_429(self) -> None:
+        exc = ChatClientException("Error code: 429 - Rate limit exceeded")
+        assert _is_retryable_error(exc) is True
+
+    def test_rate_limit_text(self) -> None:
+        exc = ChatClientException("Rate limit reached for model gpt-4o")
+        assert _is_retryable_error(exc) is True
+
+    def test_server_error_500(self) -> None:
+        exc = ChatClientException("Error code: 500 - Internal server error")
+        assert _is_retryable_error(exc) is True
+
+    def test_server_error_502(self) -> None:
+        exc = ChatClientException("Error code: 502 - Bad gateway")
+        assert _is_retryable_error(exc) is True
+
+    def test_server_error_503(self) -> None:
+        exc = ChatClientException("Error code: 503 - Service unavailable")
+        assert _is_retryable_error(exc) is True
+
+    def test_server_error_504(self) -> None:
+        exc = ChatClientException("Error code: 504 - Gateway timeout")
+        assert _is_retryable_error(exc) is True
+
+    def test_non_retryable_chat_client_error(self) -> None:
+        """A ChatClientException that doesn't match known patterns should not retry."""
+        exc = ChatClientException("Invalid API key provided")
+        assert _is_retryable_error(exc) is False
+
+    def test_non_chat_client_exception(self) -> None:
+        """Non-ChatClientException errors should never be retried."""
+        assert _is_retryable_error(RuntimeError("something failed")) is False
+        assert _is_retryable_error(ValueError("bad value")) is False
+
+    def test_plain_exception(self) -> None:
+        assert _is_retryable_error(Exception("generic")) is False
+
+
+class TestRetryDelay:
+    """Test the ``_retry_delay`` exponential back-off function."""
+
+    def test_delay_increases_with_attempt(self) -> None:
+        """Later attempts should produce larger (expected) delays."""
+        # Run many samples to get stable averages
+        samples = 200
+        avg_0 = sum(_retry_delay(0) for _ in range(samples)) / samples
+        avg_1 = sum(_retry_delay(1) for _ in range(samples)) / samples
+        avg_2 = sum(_retry_delay(2) for _ in range(samples)) / samples
+        assert avg_0 < avg_1 < avg_2
+
+    def test_delay_is_capped(self) -> None:
+        """Delay should never exceed _RETRY_MAX_DELAY_S * 1.25 (max jitter)."""
+        for attempt in range(10):
+            delay = _retry_delay(attempt)
+            assert delay <= _RETRY_MAX_DELAY_S * 1.25 + 0.01  # small float tolerance
+
+    def test_delay_is_positive(self) -> None:
+        for attempt in range(5):
+            assert _retry_delay(attempt) > 0
+
+
+# ---------------------------------------------------------------------------
+# Retry integration tests
+# ---------------------------------------------------------------------------
+
+
+class TestOrchestratorRetry:
+    """Verify the orchestrator's retry logic for transient Foundry errors."""
+
+    @patch("m2la_agents.orchestrator._retry_delay", return_value=0.0)
+    def test_retry_succeeds_after_transient_error(self, _mock_delay: Any) -> None:
+        """Orchestrator should retry on retryable ChatClientException and succeed."""
+        client = _RetryableChatClient(failures=1)
+        orchestrator = MigrationOrchestrator(
+            agents=[_SuccessAgent("A")],
+            client=client,
+            max_retries=3,
+        )
+
+        result = orchestrator.run("/fake/path")
+
+        assert result.overall_status in (AgentStatus.SUCCESS, AgentStatus.PARTIAL, AgentStatus.FAILURE)
+        assert result.correlation_id
+        # The client should have been called more than once (retry)
+        assert client.call_count >= 2
+
+    @patch("m2la_agents.orchestrator._retry_delay", return_value=0.0)
+    def test_retry_exhausted_raises(self, _mock_delay: Any) -> None:
+        """When all retries are exhausted, the error should propagate."""
+        client = _RetryableChatClient(failures=10)  # More failures than retries
+        orchestrator = MigrationOrchestrator(
+            agents=[_SuccessAgent("A")],
+            client=client,
+            max_retries=2,
+        )
+
+        with pytest.raises(ChatClientException, match="No tool call found"):
+            orchestrator.run("/fake/path")
+
+    @patch("m2la_agents.orchestrator._retry_delay", return_value=0.0)
+    def test_non_retryable_error_not_retried(self, _mock_delay: Any) -> None:
+        """Non-retryable ChatClientException should propagate immediately."""
+        client = _RetryableChatClient(
+            failures=5,
+            error_message="Invalid API key — unauthorized",
+        )
+        orchestrator = MigrationOrchestrator(
+            agents=[_SuccessAgent("A")],
+            client=client,
+            max_retries=3,
+        )
+
+        with pytest.raises(ChatClientException, match="Invalid API key"):
+            orchestrator.run("/fake/path")
+
+        # Should have been called only once — no retries
+        assert client.call_count == 1
+
+    @patch("m2la_agents.orchestrator._retry_delay", return_value=0.0)
+    def test_non_chat_client_exception_not_retried(self, _mock_delay: Any) -> None:
+        """RuntimeError and other non-framework exceptions should not retry."""
+        error_client = _ErrorRaisingChatClient(
+            error=RuntimeError("Simulated runtime error"),
+        )
+        orchestrator = MigrationOrchestrator(
+            agents=[_SuccessAgent("A")],
+            client=error_client,
+            max_retries=3,
+        )
+
+        with pytest.raises(RuntimeError, match="Simulated runtime error"):
+            orchestrator.run("/fake/path")
+
+    def test_max_retries_zero_no_retry(self) -> None:
+        """With max_retries=0, no retries should be attempted."""
+        client = _RetryableChatClient(failures=1)
+        orchestrator = MigrationOrchestrator(
+            agents=[_SuccessAgent("A")],
+            client=client,
+            max_retries=0,
+        )
+
+        with pytest.raises(ChatClientException, match="No tool call found"):
+            orchestrator.run("/fake/path")
+
+        assert client.call_count == 1
+
+    def test_max_retries_default(self) -> None:
+        """Default max_retries should be _DEFAULT_MAX_RETRIES."""
+        client = MockChatClient()
+        orchestrator = MigrationOrchestrator(
+            agents=[_SuccessAgent("A")],
+            client=client,
+        )
+        assert orchestrator.max_retries == _DEFAULT_MAX_RETRIES
+
+    def test_max_retries_negative_clamped_to_zero(self) -> None:
+        """Negative max_retries should be clamped to 0."""
+        client = MockChatClient()
+        orchestrator = MigrationOrchestrator(
+            agents=[_SuccessAgent("A")],
+            client=client,
+            max_retries=-5,
+        )
+        assert orchestrator.max_retries == 0
+
+    @patch("m2la_agents.orchestrator._retry_delay", return_value=0.0)
+    def test_retry_with_multiple_agents(self, _mock_delay: Any) -> None:
+        """Retry should work correctly with multi-agent pipelines."""
+        client = _RetryableChatClient(failures=1)
+        orchestrator = MigrationOrchestrator(
+            agents=[_SuccessAgent("A"), _SuccessAgent("B")],
+            client=client,
+            max_retries=3,
+        )
+
+        result = orchestrator.run("/fake/path")
+
+        assert result.correlation_id
+        assert client.call_count >= 2
