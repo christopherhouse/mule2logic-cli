@@ -87,13 +87,11 @@ class RepairAdvisorAgent(BaseAgent):
     """
 
     def __init__(self) -> None:
+        from m2la_agents.prompts import REPAIR_ADVISOR_PROMPT
+
         super().__init__(
             name="RepairAdvisorAgent",
-            instructions=(
-                "You are a repair advisor agent for MuleSoft to Logic Apps migration. "
-                "Use the suggest_repairs tool to analyze validation issues and migration "
-                "gaps and produce actionable repair suggestions."
-            ),
+            instructions=REPAIR_ADVISOR_PROMPT,
         )
 
     def _register_tools(self) -> None:

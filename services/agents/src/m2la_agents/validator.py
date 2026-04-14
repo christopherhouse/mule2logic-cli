@@ -34,13 +34,11 @@ class ValidatorAgent(BaseAgent):
     """
 
     def __init__(self) -> None:
+        from m2la_agents.prompts import VALIDATOR_PROMPT
+
         super().__init__(
             name="ValidatorAgent",
-            instructions=(
-                "You are a validation agent for MuleSoft to Logic Apps migration. "
-                "Use the validate_output_artifacts tool to check generated Logic Apps "
-                "artifacts for correctness and completeness."
-            ),
+            instructions=VALIDATOR_PROMPT,
         )
 
     def _register_tools(self) -> None:

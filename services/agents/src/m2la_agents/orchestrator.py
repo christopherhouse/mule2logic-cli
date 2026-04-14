@@ -8,14 +8,19 @@ Pipeline stages:
 4. **Validate**  — validate generated output
 5. **Repair**    — (optional) suggest fixes for issues and gaps
 
+**Online mode** (Azure AI Agent Service):
+
+The orchestrator creates each sub-agent on the service, then creates a
+**main orchestrator agent** that references the sub-agents as
+:class:`~azure.ai.agents.models.ConnectedAgentTool` definitions.
+A single thread + run is created for the main agent, which uses LLM
+reasoning to delegate tasks to sub-agents and collect their results.
+
+**Offline mode** (default):
+
 Each step's output is deposited into the shared :class:`AgentContext` and
 feeds into the next step. If any step returns ``FAILURE``, the pipeline
 stops and returns a partial :class:`OrchestrationResult`.
-
-When an ``AgentsClient`` is provided the orchestrator creates agents on the
-Azure AI Agent Service and uses LLM-backed runs.  When no client is
-provided (the default) the pipeline runs in **offline mode** — each agent's
-:meth:`~BaseAgent.execute` is called directly.
 
 Correlation IDs (:func:`uuid.uuid4`) and timing (:func:`time.monotonic`)
 are managed here and propagated through the context.
@@ -35,6 +40,7 @@ from m2la_agents.analyzer import AnalyzerAgent
 from m2la_agents.base import BaseAgent
 from m2la_agents.models import AgentContext, AgentResult, AgentStatus, OrchestrationResult, StepResult
 from m2la_agents.planner import PlannerAgent
+from m2la_agents.prompts import ORCHESTRATOR_PROMPT
 from m2la_agents.repair_advisor import RepairAdvisorAgent
 from m2la_agents.sdk_config import AgentsClientConfig
 from m2la_agents.transformer import TransformerAgent
@@ -45,6 +51,30 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Descriptions used by the orchestrator LLM to decide when to delegate.
+_AGENT_DESCRIPTIONS: dict[str, str] = {
+    "AnalyzerAgent": (
+        "Parses and analyzes MuleSoft input (project or single flow XML). "
+        "Invoke to discover flows, sub-flows, constructs, and input issues."
+    ),
+    "PlannerAgent": (
+        "Evaluates mapping availability for each MuleSoft construct and "
+        "produces a migration plan with supported/unsupported/partial counts."
+    ),
+    "TransformerAgent": (
+        "Converts the MuleSoft IR into Logic Apps Standard artifacts "
+        "(workflow.json, host.json, connections.json). Reports migration gaps."
+    ),
+    "ValidatorAgent": (
+        "Validates generated Logic Apps artifacts for schema correctness "
+        "and completeness. Reports validation issues with rule IDs."
+    ),
+    "RepairAdvisorAgent": (
+        "Analyzes validation failures and migration gaps, then suggests "
+        "actionable repair strategies with confidence levels."
+    ),
+}
+
 
 class MigrationOrchestrator:
     """Runs the full migration pipeline through a sequence of agents.
@@ -53,9 +83,12 @@ class MigrationOrchestrator:
 
     * **Offline** (default) — each agent's :meth:`~BaseAgent.execute`
       method is called directly.  No LLM calls or network access.
-    * **Online** — agents are created on the Azure AI Agent Service via
-      ``AgentsClient`` and runs use LLM-backed reasoning with the
-      registered :class:`FunctionTool` callables.
+    * **Online** — a multi-agent setup is created on the Azure AI Agent
+      Service.  Sub-agents are registered as
+      :class:`~azure.ai.agents.models.ConnectedAgentTool` definitions
+      on a main orchestrator agent.  The orchestrator LLM delegates
+      tasks to sub-agents via threads + runs, each sub-agent invokes
+      its ``FunctionTool`` callables deterministically.
 
     Usage::
 
@@ -71,11 +104,15 @@ class MigrationOrchestrator:
             endpoint="https://...",
             credential=DefaultAzureCredential(),
         )
-        orchestrator = MigrationOrchestrator(client=client)
+        config = AgentsClientConfig(
+            endpoint="https://...",
+            model_deployment="gpt-4o",
+        )
+        orchestrator = MigrationOrchestrator(client=client, config=config)
         result = orchestrator.run(input_path="/path/to/mule-project")
 
     Attributes:
-        agents: Ordered list of agents in the pipeline.
+        agents: Ordered list of sub-agents in the pipeline.
         include_repair: Whether to include the repair advisor step.
         client: Optional ``AgentsClient`` for online mode.
         config: SDK configuration (model deployment, endpoint, etc.).
@@ -154,7 +191,7 @@ class MigrationOrchestrator:
         )
 
     # ------------------------------------------------------------------
-    # Online mode — Azure AI Agent Service
+    # Online mode — multi-agent via ConnectedAgentTool
     # ------------------------------------------------------------------
 
     def _run_online(
@@ -168,16 +205,23 @@ class MigrationOrchestrator:
         span_id: str = "",
         metadata: dict | None = None,
     ) -> OrchestrationResult:
-        """Run using Azure AI Agents Service.
+        """Run using the Azure AI Agent Service with multi-agent orchestration.
 
-        Creates agents on the service, enables auto function calls,
-        creates threads and runs for each agent in sequence, collects
-        results, then cleans up.
+        1. Create each sub-agent on the service with its ``FunctionTool``.
+        2. Enable auto-function-calls so the SDK invokes tools automatically.
+        3. Wire sub-agents as ``ConnectedAgentTool`` on the main orchestrator.
+        4. Create a thread, post the user's migration request as a message.
+        5. Run the orchestrator agent — it delegates to sub-agents via the
+           LLM's natural-language routing.
+        6. Extract the agent's response from the thread messages.
+        7. Also run the deterministic offline path to collect structured data.
+        8. Clean up all agents from the service.
         """
         assert self.client is not None  # ensured by caller
 
         cid = correlation_id or str(uuid.uuid4())
         pipeline_start = time.monotonic()
+        model = self.config.model_deployment
 
         context = AgentContext(
             correlation_id=cid,
@@ -189,48 +233,104 @@ class MigrationOrchestrator:
             metadata=metadata or {},
         )
 
-        steps: list[StepResult] = []
-        overall_status = AgentStatus.SUCCESS
-        final_output = None
+        orchestrator_agent_id: str | None = None
 
         try:
-            # Register agents on the service
+            # ---- Step 1: Create sub-agents on the service ----------------
             for agent in self.agents:
-                agent.create_on_service(self.client, self.config.model_deployment)
+                agent.create_on_service(self.client, model)
                 self.client.enable_auto_function_calls(agent.toolset)
+                logger.info(
+                    "Created sub-agent %s on service (id=%s)",
+                    agent.name,
+                    agent.sdk_agent_id,
+                )
 
-            # Run each agent in sequence via thread + run
+            # ---- Step 2: Wire sub-agents as ConnectedAgentTool -----------
+            connected_tools: list = []
+            for agent in self.agents:
+                description = _AGENT_DESCRIPTIONS.get(
+                    agent.name,
+                    f"Sub-agent: {agent.name}",
+                )
+                connected = agent.as_connected_agent_tool(description)
+                connected_tools.extend(connected.definitions)
+
+            # ---- Step 3: Create the main orchestrator agent --------------
+            orchestrator_agent = self.client.create_agent(
+                model=model,
+                name="MigrationOrchestrator",
+                instructions=ORCHESTRATOR_PROMPT,
+                tools=connected_tools,
+            )
+            orchestrator_agent_id = orchestrator_agent.id
+            logger.info(
+                "Created orchestrator agent (id=%s) with %d connected sub-agents",
+                orchestrator_agent_id,
+                len(self.agents),
+            )
+
+            # ---- Step 4: Create a thread and post the migration request --
+            thread = self.client.threads.create()
+            logger.info("Created thread (id=%s)", thread.id)
+
+            # Build a rich user message with all the context
+            mode_str = input_mode.value if input_mode else "auto-detect"
+            user_message = (
+                f"Please migrate the MuleSoft project at: {input_path}\n\n"
+                f"Configuration:\n"
+                f"- Input mode: {mode_str}\n"
+                f"- Output directory: {output_directory or 'default'}\n"
+                f"- Correlation ID: {cid}\n\n"
+                f"Execute the full migration pipeline: "
+                f"analyze → plan → transform → validate → repair.\n"
+                f"Report the results from each step."
+            )
+
+            from azure.ai.agents.models import MessageRole
+
+            self.client.messages.create(
+                thread_id=thread.id,
+                role=MessageRole.USER,
+                content=user_message,
+            )
+
+            # ---- Step 5: Run the orchestrator agent ----------------------
+            run = self.client.runs.create_and_process(
+                thread_id=thread.id,
+                agent_id=orchestrator_agent_id,
+            )
+            logger.info(
+                "Orchestrator run completed: status=%s, id=%s",
+                run.status,
+                run.id,
+            )
+
+            # ---- Step 6: Extract the agent's response --------------------
+            agent_response = ""
+            if hasattr(run, "status") and run.status == "failed":
+                error_msg = getattr(run, "last_error", None)
+                logger.warning("Orchestrator run failed: %s", error_msg)
+            else:
+                messages = self.client.messages.list(thread_id=thread.id)
+                for msg in messages:
+                    if hasattr(msg, "role") and str(msg.role) == "MessageRole.AGENT":
+                        if hasattr(msg, "text_messages") and msg.text_messages:
+                            agent_response = msg.text_messages[-1].text.value
+                            break
+
+            # ---- Step 7: Run deterministic path for structured output ----
+            # The online path gives us LLM reasoning; the offline path
+            # gives us the structured AgentResult objects we need.
+            steps: list[StepResult] = []
+            overall_status = AgentStatus.SUCCESS
+            final_output = None
+
             for agent in self.agents:
                 step_start = datetime.now(UTC)
-
-                try:
-                    thread = self.client.threads.create()
-                    self.client.messages.create(
-                        thread_id=thread.id,
-                        role="user",
-                        content=(f"Process the migration step for input: {input_path}. Correlation ID: {cid}."),
-                    )
-
-                    run = self.client.runs.create_and_process(
-                        thread_id=thread.id,
-                        agent_id=agent.sdk_agent_id,
-                    )
-                    logger.info(
-                        "Agent %s run completed: status=%s, id=%s",
-                        agent.name,
-                        run.status,
-                        run.id,
-                    )
-
-                    # The function tools ran deterministically; fall back
-                    # to the offline result for structured output.
-                    result: AgentResult = agent.execute(context)
-
-                except Exception as exc:
-                    logger.warning("Online run failed for %s, falling back to offline: %s", agent.name, exc)
-                    result = agent.execute(context)
-
+                result: AgentResult = agent.execute(context)
                 step_end = datetime.now(UTC)
+
                 step = StepResult(
                     step_name=agent.name,
                     agent_result=result,
@@ -248,8 +348,26 @@ class MigrationOrchestrator:
 
                 final_output = result.output
 
+            # Attach the LLM's reasoning to the final output
+            if agent_response:
+                if final_output is None:
+                    final_output = {}
+                if isinstance(final_output, dict):
+                    final_output["orchestrator_reasoning"] = agent_response
+
         finally:
-            # Always clean up agents from the service
+            # ---- Step 8: Clean up all agents from the service ------------
+            if orchestrator_agent_id:
+                try:
+                    self.client.delete_agent(orchestrator_agent_id)
+                    logger.info("Deleted orchestrator agent %s", orchestrator_agent_id)
+                except Exception:
+                    logger.warning(
+                        "Failed to delete orchestrator agent %s",
+                        orchestrator_agent_id,
+                        exc_info=True,
+                    )
+
             for agent in self.agents:
                 try:
                     agent.cleanup(self.client)

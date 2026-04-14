@@ -1,48 +1,134 @@
 # Agent Orchestration Service
 
-Microsoft Agent Framework orchestration layer for the MuleSoft → Logic Apps
-migration platform, powered by the
+**Multi-agent orchestration** layer for the MuleSoft → Logic Apps migration
+platform, powered by the
 [Azure AI Agents SDK](https://learn.microsoft.com/en-us/azure/ai-services/agents/)
-(`azure-ai-agents`).
+(`azure-ai-agents`) and the
+[ConnectedAgentTool](https://learn.microsoft.com/en-us/azure/foundry-classic/agents/how-to/connected-agents)
+multi-agent pattern.
 
 ## Architecture Overview
 
-Agents are **thin orchestration wrappers** around the deterministic migration
-services. They do **not** replace the services — they compose them into a
-structured pipeline with correlation IDs, telemetry propagation, and
-human-readable reasoning summaries.
+The orchestrator implements true **multi-agent orchestration** where a main
+orchestrator agent delegates to specialized sub-agents via the Azure AI Agent
+Service.
 
-Each agent registers its deterministic service logic as `FunctionTool`
-callables via the Azure AI Agents SDK. This enables two execution modes:
-
-* **Offline mode** (default) — agents call their deterministic services
-  directly via `execute()`.  No LLM calls or network access.  Used in
-  tests and CI.
-* **Online mode** — agents are created on the Azure AI Agent Service via
-  `AgentsClient`.  The backing LLM can reason about the migration and
-  invoke the registered `FunctionTool` callables.
+Each sub-agent:
+- Has rich **system prompts** (`prompts.py`) with domain-specific instructions
+- Registers deterministic services as **`FunctionTool`** callables via `ToolSet`
+- Is created on the Azure AI Agent Service via `AgentsClient.create_agent()`
+- Is wired to the orchestrator as a **`ConnectedAgentTool`** for LLM-driven delegation
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    MigrationOrchestrator                        │
-│          (online via AgentsClient  /  offline via execute())    │
-│                                                                 │
-│  ┌──────────┐  ┌─────────┐  ┌─────────────┐  ┌───────────┐    │
-│  │ Analyzer │→ │ Planner │→ │ Transformer │→ │ Validator │──┐ │
-│  └────┬─────┘  └────┬────┘  └──────┬──────┘  └─────┬─────┘  │ │
-│       │              │              │                │         │ │
-│       ▼              ▼              ▼                ▼         ▼ │
-│  ┌─────────┐  ┌───────────┐ ┌───────────┐  ┌──────────┐ ┌────┐│
-│  │ Parser  │  │ Mapping   │ │ Transform │  │ Validate │ │Rep.││
-│  │ IR Build│  │ Config    │ │ Generator │  │ Engine   │ │Adv.││
-│  │ Validate│  │ Resolver  │ │           │  │          │ │    ││
-│  └─────────┘  └───────────┘ └───────────┘  └──────────┘ └────┘│
-│       ▲              ▲              ▲                ▲          │
-│       └──────────────┴──────────────┴────────────────┘          │
-│                  Deterministic Services                          │
-│              (exposed as FunctionTool callables)                 │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         Azure AI Agent Service                         │
+│                                                                        │
+│  ┌──────────────────────────────────────────────────────────────────┐  │
+│  │              MigrationOrchestrator Agent (main)                  │  │
+│  │              Instructions: ORCHESTRATOR_PROMPT                    │  │
+│  │              Tools: ConnectedAgentTool × 5 sub-agents           │  │
+│  └──────────┬───────────┬───────────┬───────────┬──────────────────┘  │
+│             │           │           │           │                      │
+│    ┌────────▼──┐  ┌─────▼─────┐  ┌─▼──────────┐ ┌──▼───────┐         │
+│    │ Analyzer  │  │  Planner  │  │ Transformer │ │Validator │  ┌────┐ │
+│    │ Agent     │  │  Agent    │  │ Agent       │ │Agent     │  │Rep.│ │
+│    │           │  │           │  │             │ │          │  │Adv.│ │
+│    │ FuncTool: │  │ FuncTool: │  │ FuncTool:   │ │FuncTool: │  │    │ │
+│    │ analyze   │  │ plan      │  │ transform   │ │validate  │  │    │ │
+│    └─────┬─────┘  └─────┬─────┘  └──────┬─────┘ └────┬─────┘  └──┬─┘ │
+│          │              │               │             │            │   │
+│  ┌───────▼──────────────▼───────────────▼─────────────▼────────────▼─┐ │
+│  │                    Deterministic Services                         │ │
+│  │  m2la_parser │ m2la_ir │ m2la_transform │ m2la_validate │ config  │ │
+│  └──────────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────────────┘
+
+Thread: user message → orchestrator reasons → delegates to sub-agents →
+        sub-agents invoke FunctionTools → orchestrator compiles response
 ```
+
+## Multi-Agent Orchestration (Online Mode)
+
+In online mode, the orchestrator creates a proper multi-agent setup:
+
+1. **Create sub-agents** — Each agent (`AnalyzerAgent`, `PlannerAgent`, etc.)
+   is created on the Azure AI Agent Service with its `FunctionTool` and
+   domain-specific system prompt.
+
+2. **Wire as ConnectedAgentTool** — Sub-agents are registered as
+   `ConnectedAgentTool` definitions on the main orchestrator agent, enabling
+   the LLM to delegate tasks via natural language routing.
+
+3. **Create orchestrator agent** — A main `MigrationOrchestrator` agent is
+   created with the `ORCHESTRATOR_PROMPT` and connected sub-agents as tools.
+
+4. **Thread + message** — A conversation thread is created with a rich user
+   message describing the migration request (input path, mode, correlation ID).
+
+5. **Run** — The orchestrator agent run is executed. The LLM reasons about the
+   migration pipeline, delegates to sub-agents, and compiles results.
+
+6. **Structured output** — The deterministic `execute()` path is also run
+   to produce structured `AgentResult` objects. The LLM's reasoning is
+   attached as `orchestrator_reasoning` in the final output.
+
+7. **Cleanup** — All agents (orchestrator + sub-agents) are deleted from the
+   service.
+
+```python
+from azure.ai.agents import AgentsClient
+from azure.identity import DefaultAzureCredential
+
+from m2la_agents import AgentsClientConfig, MigrationOrchestrator
+
+client = AgentsClient(
+    endpoint="https://<project>.api.azureml.ms",
+    credential=DefaultAzureCredential(),
+)
+config = AgentsClientConfig(
+    endpoint="https://<project>.api.azureml.ms",
+    model_deployment="gpt-4o",
+)
+
+orchestrator = MigrationOrchestrator(client=client, config=config)
+result = orchestrator.run(
+    input_path="/path/to/mule-project",
+    output_directory="/path/to/output",
+)
+
+# LLM reasoning from the orchestrator agent
+if isinstance(result.final_output, dict):
+    print(result.final_output.get("orchestrator_reasoning"))
+```
+
+## Offline Mode (Default)
+
+No Azure credentials or network required.  Each agent's `execute()` method
+is called directly.  This is the mode used in tests and CI.
+
+```python
+from m2la_agents import MigrationOrchestrator
+
+orchestrator = MigrationOrchestrator()
+result = orchestrator.run(input_path="/path/to/mule-project")
+
+print(result.overall_status)
+for step in result.steps:
+    print(f"{step.step_name}: {step.agent_result.reasoning_summary}")
+```
+
+## System Prompts
+
+Each agent has a rich, domain-specific system prompt in `prompts.py`:
+
+| Prompt | Agent | Purpose |
+|--------|-------|---------|
+| `ORCHESTRATOR_PROMPT` | Main orchestrator | Pipeline coordination, delegation rules, output format |
+| `ANALYZER_PROMPT` | AnalyzerAgent | Input parsing, IR building, validation reporting |
+| `PLANNER_PROMPT` | PlannerAgent | Mapping evaluation, plan generation, gap estimation |
+| `TRANSFORMER_PROMPT` | TransformerAgent | IR→Logic Apps conversion, gap tracking |
+| `VALIDATOR_PROMPT` | ValidatorAgent | Schema validation, issue reporting |
+| `REPAIR_ADVISOR_PROMPT` | RepairAdvisorAgent | Issue analysis, repair suggestion, confidence levels |
 
 ## Data Flow
 
@@ -75,52 +161,6 @@ AgentContext (correlation_id, input_path, accumulated_data)
         └─ Deposits: repair_suggestions
 ```
 
-## Online vs Offline Mode
-
-### Offline Mode (Default)
-
-No Azure credentials or network required.  Each agent's `execute()` method
-is called directly.  This is the mode used in tests and CI.
-
-```python
-from m2la_agents import MigrationOrchestrator
-
-orchestrator = MigrationOrchestrator()
-result = orchestrator.run(input_path="/path/to/mule-project")
-
-print(result.overall_status)
-for step in result.steps:
-    print(f"{step.step_name}: {step.agent_result.reasoning_summary}")
-```
-
-### Online Mode (Azure AI Agent Service)
-
-Requires an Azure AI Foundry project endpoint and credentials.  Agents
-are created on the service, and the backing LLM can invoke registered
-`FunctionTool` callables.
-
-```python
-from azure.ai.agents import AgentsClient
-from azure.identity import DefaultAzureCredential
-
-from m2la_agents import AgentsClientConfig, MigrationOrchestrator
-
-client = AgentsClient(
-    endpoint="https://<project>.api.azureml.ms",
-    credential=DefaultAzureCredential(),
-)
-config = AgentsClientConfig(
-    endpoint="https://<project>.api.azureml.ms",
-    model_deployment="gpt-4o",
-)
-
-orchestrator = MigrationOrchestrator(client=client, config=config)
-result = orchestrator.run(
-    input_path="/path/to/mule-project",
-    output_directory="/path/to/output",
-)
-```
-
 ## Configuration
 
 `AgentsClientConfig` controls the SDK connection:
@@ -132,35 +172,36 @@ result = orchestrator.run(
 
 ## Agent Descriptions
 
-| Agent | Responsibility | FunctionTool | Deterministic Services Used |
-|-------|---------------|-------------|---------------------------|
-| **AnalyzerAgent** | Parse input, build IR, validate input | `analyze_mule_input` | `m2la_parser`, `m2la_ir`, `m2la_validate` |
-| **PlannerAgent** | Evaluate mapping availability, create plan | `create_migration_plan` | `m2la_mapping_config` |
-| **TransformerAgent** | Generate Logic Apps artifacts from IR | `transform_to_logic_apps` | `m2la_transform`, `m2la_validate` |
-| **ValidatorAgent** | Validate generated output artifacts | `validate_output_artifacts` | `m2la_validate` |
-| **RepairAdvisorAgent** | Suggest fixes for issues and gaps | `suggest_repairs` | Rule-based mapping (no external services) |
+| Agent | Responsibility | FunctionTool | ConnectedAgentTool Description |
+|-------|---------------|-------------|-------------------------------|
+| **AnalyzerAgent** | Parse input, build IR, validate input | `analyze_mule_input` | "Parses and analyzes MuleSoft input..." |
+| **PlannerAgent** | Evaluate mapping availability, create plan | `create_migration_plan` | "Evaluates mapping availability..." |
+| **TransformerAgent** | Generate Logic Apps artifacts from IR | `transform_to_logic_apps` | "Converts the MuleSoft IR into Logic Apps..." |
+| **ValidatorAgent** | Validate generated output artifacts | `validate_output_artifacts` | "Validates generated Logic Apps artifacts..." |
+| **RepairAdvisorAgent** | Suggest fixes for issues and gaps | `suggest_repairs` | "Analyzes validation failures and migration gaps..." |
 
-## Where Deterministic Logic Ends and Orchestration Begins
+## Where Deterministic Logic Ends and AI Begins
 
 - **Deterministic logic** lives in the service packages (`m2la_parser`,
   `m2la_ir`, `m2la_transform`, `m2la_validate`, `m2la_mapping_config`).
   These services parse XML, build data structures, generate JSON, and
   validate output — all with predictable, testable behaviour.
 
-- **Orchestration logic** lives here in `m2la_agents`. Agents decide which
-  services to call, in what order, how to handle errors, and how to compose
-  results into a pipeline. They also produce human-readable reasoning summaries.
+- **Agent orchestration** lives here in `m2la_agents`. Each agent has a rich
+  system prompt and deterministic `FunctionTool` callables.
 
-- **SDK integration** exposes deterministic logic as `FunctionTool` callables.
-  When running online, the LLM can invoke these tools and add reasoning on top.
-  The tools do not replace the deterministic logic — they wrap it.
+- **AI-driven orchestration** happens in online mode. The main orchestrator
+  agent uses LLM reasoning to delegate to sub-agents via `ConnectedAgentTool`,
+  coordinate the pipeline, and produce a coherent migration summary. The LLM
+  adds reasoning, explanations, and recommendations on top of the deterministic
+  tool outputs.
 
 ## Development
 
 ```bash
 cd services/agents
 uv sync
-uv run pytest
+uv run pytest -v          # 142 tests
 uv run ruff check src/ tests/
 uv run ruff format --check src/ tests/
 ```

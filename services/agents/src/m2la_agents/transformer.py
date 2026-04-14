@@ -41,13 +41,11 @@ class TransformerAgent(BaseAgent):
     """
 
     def __init__(self) -> None:
+        from m2la_agents.prompts import TRANSFORMER_PROMPT
+
         super().__init__(
             name="TransformerAgent",
-            instructions=(
-                "You are a transformation agent for MuleSoft to Logic Apps migration. "
-                "Use the transform_to_logic_apps tool to convert intermediate "
-                "representation into Logic Apps Standard artifacts."
-            ),
+            instructions=TRANSFORMER_PROMPT,
         )
 
     def _register_tools(self) -> None:

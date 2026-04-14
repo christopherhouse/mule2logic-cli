@@ -83,14 +83,11 @@ class PlannerAgent(BaseAgent):
     """
 
     def __init__(self) -> None:
+        from m2la_agents.prompts import PLANNER_PROMPT
+
         super().__init__(
             name="PlannerAgent",
-            instructions=(
-                "You are a planning agent for MuleSoft to Logic Apps migration. "
-                "Use the create_migration_plan tool to evaluate mapping availability "
-                "and produce a migration plan that describes which constructs are "
-                "supported, unsupported, or partially supported."
-            ),
+            instructions=PLANNER_PROMPT,
         )
 
     def _register_tools(self) -> None:

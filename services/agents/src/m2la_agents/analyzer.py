@@ -146,14 +146,11 @@ class AnalyzerAgent(BaseAgent):
     """
 
     def __init__(self) -> None:
+        from m2la_agents.prompts import ANALYZER_PROMPT
+
         super().__init__(
             name="AnalyzerAgent",
-            instructions=(
-                "You are an analysis agent for MuleSoft to Logic Apps migration. "
-                "Use the analyze_mule_input tool to parse and analyze the input "
-                "MuleSoft project or flow XML.  Report the number of flows, "
-                "sub-flows, constructs, and any warnings found."
-            ),
+            instructions=ANALYZER_PROMPT,
         )
 
     def _register_tools(self) -> None:

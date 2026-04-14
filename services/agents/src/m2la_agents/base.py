@@ -12,8 +12,9 @@ All agents extend :class:`BaseAgent` and implement:
 * :meth:`execute` — the offline / deterministic execution path.
 
 The base class provides SDK lifecycle helpers
-(:meth:`create_on_service`, :meth:`cleanup`) and a standardised
-``execute(context) → AgentResult`` contract.
+(:meth:`create_on_service`, :meth:`as_connected_agent_tool`,
+:meth:`cleanup`) and a standardised ``execute(context) → AgentResult``
+contract.
 """
 
 from __future__ import annotations
@@ -27,6 +28,7 @@ from m2la_agents.models import AgentContext, AgentResult
 
 if TYPE_CHECKING:
     from azure.ai.agents import AgentsClient
+    from azure.ai.agents.models import ConnectedAgentTool
 
 
 class BaseAgent(ABC):
@@ -39,9 +41,14 @@ class BaseAgent(ABC):
     is provided (**offline mode**), agents execute their deterministic
     logic directly.
 
+    In **online mode** the orchestrator wires sub-agents as
+    :class:`~azure.ai.agents.models.ConnectedAgentTool` definitions
+    attached to a main orchestrator agent, enabling true multi-agent
+    delegation via the Azure AI Agent Service.
+
     Attributes:
         name: Human-readable agent name (e.g. ``"AnalyzerAgent"``).
-        instructions: Agent instructions for the LLM (when using SDK).
+        instructions: Agent system prompt / instructions for the LLM.
         toolset: SDK ``ToolSet`` with registered ``FunctionTool`` callables.
         sdk_agent_id: ID of the agent created on the service
             (``None`` in offline mode).
@@ -90,6 +97,37 @@ class BaseAgent(ABC):
         )
         self.sdk_agent_id = sdk_agent.id
         return sdk_agent.id
+
+    def as_connected_agent_tool(self, description: str) -> ConnectedAgentTool:
+        """Return a :class:`ConnectedAgentTool` definition for this agent.
+
+        This allows the orchestrator to wire this agent as a **sub-agent**
+        that the main orchestrator agent can delegate tasks to via the
+        Azure AI Agent Service.
+
+        Args:
+            description: A short description of when this sub-agent
+                should be invoked (used by the LLM for routing).
+
+        Returns:
+            A ``ConnectedAgentTool`` suitable for passing to
+            ``create_agent(tools=...)``.
+
+        Raises:
+            RuntimeError: If the agent has not been created on the
+                service yet (``sdk_agent_id is None``).
+        """
+        from azure.ai.agents.models import ConnectedAgentTool
+
+        if self.sdk_agent_id is None:
+            msg = f"{self.name} has not been created on the service yet. Call create_on_service() first."
+            raise RuntimeError(msg)
+
+        return ConnectedAgentTool(
+            id=self.sdk_agent_id,
+            name=self.name,
+            description=description,
+        )
 
     def cleanup(self, client: AgentsClient) -> None:
         """Delete this agent from the service."""
