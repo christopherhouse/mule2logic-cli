@@ -15,6 +15,7 @@ dependencies = [
     "m2la-agents",
     "pydantic-settings",
     "azure-identity",
+    "python-multipart>=0.0.26",
 ]
 
 [tool.uv.sources]
@@ -50,4 +51,5 @@ select = ["E", "F", "I", "W", "UP"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["tests"]
 asyncio_mode = "auto"
