@@ -45,9 +45,6 @@ COPY services/validate/src/ services/validate/src/
 COPY services/agents/pyproject.toml services/agents/pyproject.toml
 COPY services/agents/src/ services/agents/src/
 
-# Copy mapping config data files
-COPY packages/mapping-config/ packages/mapping-config/
-
 # Copy API dependency files for layer caching
 COPY apps/api/pyproject.toml apps/api/pyproject.toml
 COPY apps/api/uv.lock apps/api/uv.lock
