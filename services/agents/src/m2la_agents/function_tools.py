@@ -82,7 +82,7 @@ def create_migration_plan(ir_json: str) -> str:
             and ``flow_count``).
 
     Returns:
-        JSON string describing supported / unsupported / partial counts
+        JSON string describing supported / unsupported counts
         and per-construct mapping decisions.
     """
     from m2la_mapping_config.loader import load_all
@@ -103,7 +103,6 @@ def create_migration_plan(ir_json: str) -> str:
 
     supported = 0
     unsupported = 0
-    partial = 0
     decisions: list[dict] = []
 
     if mapping_config is not None:
@@ -161,9 +160,8 @@ def create_migration_plan(ir_json: str) -> str:
             "construct_summary": construct_summary,
             "supported_count": supported,
             "unsupported_count": unsupported,
-            "partial_count": partial,
             "mapping_decisions": decisions,
-            "estimated_gaps": unsupported + partial,
+            "estimated_gaps": unsupported,
         }
     )
 

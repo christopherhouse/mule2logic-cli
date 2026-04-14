@@ -95,7 +95,20 @@ class ValidatorAgent(BaseAgent):
                     first_wf = next(iter(transform_output.workflows.values()), {})
                     output_target = first_wf
                 else:
-                    output_target = {}
+                    elapsed_ms = (time.monotonic() - start) * 1000
+                    transform_output_type = type(transform_output).__name__
+                    return AgentResult(
+                        agent_name=self.name,
+                        status=AgentStatus.FAILURE,
+                        reasoning_summary=(
+                            "Invalid transform output for single-flow mode — "
+                            "expected workflow dict or object with 'workflows'"
+                        ),
+                        duration_ms=elapsed_ms,
+                        error_message=(
+                            f"Unexpected 'transform_output' type for single-flow mode: {transform_output_type}"
+                        ),
+                    )
 
             # Run validation
             report: ValidationReport = validate_output(output_target, mode)

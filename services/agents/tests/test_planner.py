@@ -78,7 +78,7 @@ class TestPlannerAgentMappingDecisions:
         result = agent.execute(ctx)
         plan = result.output
 
-        valid_statuses = {"supported", "unsupported", "partial"}
+        valid_statuses = {"supported", "unsupported"}
         for decision in plan.mapping_decisions:
             assert decision.status in valid_statuses
 
@@ -109,14 +109,14 @@ class TestPlannerAgentErrorHandling:
         assert "ir" in result.error_message.lower()
 
     def test_missing_mapping_config_graceful(self, make_context: Any, sample_ir: Any) -> None:
-        """Missing mapping config files should still produce a plan (all unsupported)."""
+        """Missing mapping config files should still produce a plan (all unsupported, PARTIAL status)."""
         agent = PlannerAgent()
         ctx = make_context(accumulated_data={"ir": sample_ir})
 
         with patch("m2la_agents.planner.load_all", side_effect=FileNotFoundError("test")):
             result = agent.execute(ctx)
 
-        assert result.status == AgentStatus.SUCCESS
+        assert result.status == AgentStatus.PARTIAL
         plan = result.output
         assert plan.supported_count == 0
 

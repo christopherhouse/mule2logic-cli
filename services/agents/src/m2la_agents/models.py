@@ -93,7 +93,7 @@ class MappingDecision(BaseModel):
     """A single mapping decision for a construct or connector in the plan."""
 
     mule_element: str = Field(..., description="MuleSoft element name")
-    status: str = Field(..., description="supported | unsupported | partial")
+    status: str = Field(..., description="supported | unsupported")
     logic_apps_equivalent: str | None = Field(default=None, description="Logic Apps equivalent, if known")
     notes: str | None = Field(default=None, description="Additional notes about the mapping")
 
@@ -112,7 +112,11 @@ class MigrationPlan(BaseModel):
     )
     supported_count: int = Field(default=0, ge=0, description="Number of fully supported constructs")
     unsupported_count: int = Field(default=0, ge=0, description="Number of unsupported constructs")
-    partial_count: int = Field(default=0, ge=0, description="Number of partially supported constructs")
+    partial_count: int = Field(
+        default=0,
+        ge=0,
+        description="Reserved for future use — mapping model currently has no partial-support state",
+    )
     mapping_decisions: list[MappingDecision] = Field(
         default_factory=list, description="Per-construct mapping decisions"
     )

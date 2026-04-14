@@ -33,37 +33,48 @@ from m2la_agents.base import BaseAgent
 from m2la_agents.models import AgentContext, AgentResult, AgentStatus, MappingDecision, MigrationPlan
 
 
+def _ir_name_to_mule_element(ir_name: str) -> str:
+    """Normalize an IR enum value to a Mule XML element name.
+
+    IR enum values use underscores (e.g. ``"scatter_gather"``, ``"set_variable"``),
+    but the mapping config uses hyphenated Mule element names (e.g. ``"scatter-gather"``,
+    ``"set-variable"``).  This function converts underscores to hyphens so that
+    :meth:`MappingResolver.resolve_construct` can find a match.
+    """
+    return ir_name.replace("_", "-")
+
+
 def _collect_constructs(flows: list[Flow]) -> list[str]:
     """Recursively collect all construct element names from flows.
 
-    Returns a flat list of element names (with duplicates) representing
-    every step across all flows.
+    Returns a flat list of Mule-style element names (with duplicates)
+    representing every step across all flows.
     """
     elements: list[str] = []
 
     def _scan_steps(steps: list[FlowStep]) -> None:
         for step in steps:
             if isinstance(step, Processor):
-                elements.append(step.type.value)
+                elements.append(_ir_name_to_mule_element(step.type.value))
             elif isinstance(step, VariableOperation):
-                elements.append(f"variable_{step.operation}")
+                elements.append(f"variable-{_ir_name_to_mule_element(step.operation)}")
             elif isinstance(step, Transform):
-                elements.append(step.type.value)
+                elements.append(_ir_name_to_mule_element(step.type.value))
             elif isinstance(step, ConnectorOperation):
-                elements.append(step.connector_type.value)
+                elements.append(_ir_name_to_mule_element(step.connector_type.value))
             elif isinstance(step, Router):
-                elements.append(step.type.value)
+                elements.append(_ir_name_to_mule_element(step.type.value))
                 for route in step.routes:
                     _scan_steps(route.steps)
                 if step.default_route:
                     _scan_steps(step.default_route.steps)
             elif isinstance(step, Scope):
-                elements.append(step.type.value)
+                elements.append(_ir_name_to_mule_element(step.type.value))
                 _scan_steps(step.steps)
 
     for flow in flows:
         if flow.trigger:
-            elements.append(flow.trigger.type.value)
+            elements.append(_ir_name_to_mule_element(flow.trigger.type.value))
         _scan_steps(flow.steps)
 
     return elements
@@ -74,8 +85,7 @@ class PlannerAgent(BaseAgent):
 
     Takes the :class:`MuleIR` from the analyzer output, loads the
     mapping configuration, and produces a :class:`MigrationPlan` that
-    describes which constructs are supported, unsupported, or partially
-    supported.
+    describes which constructs are supported or unsupported.
 
     The agent deposits the following keys into ``context.accumulated_data``:
 
@@ -143,7 +153,6 @@ class PlannerAgent(BaseAgent):
             # Evaluate mapping availability
             supported = 0
             unsupported = 0
-            partial = 0
             decisions: list[MappingDecision] = []
 
             if mapping_config is not None:
@@ -202,23 +211,25 @@ class PlannerAgent(BaseAgent):
                 construct_summary=construct_summary,
                 supported_count=supported,
                 unsupported_count=unsupported,
-                partial_count=partial,
                 mapping_decisions=decisions,
-                estimated_gaps=unsupported + partial,
+                estimated_gaps=unsupported,
             )
             context.accumulated_data["migration_plan"] = plan
 
             # Build reasoning summary
             reasoning = (
                 f"Plan for {plan.flow_count} flow(s): "
-                f"{supported} supported, {unsupported} unsupported, {partial} partial. "
+                f"{supported} supported, {unsupported} unsupported. "
                 f"Estimated {plan.estimated_gaps} gap(s)."
             )
+
+            # Return PARTIAL when there are unsupported constructs or missing mapping config
+            status = AgentStatus.PARTIAL if unsupported > 0 else AgentStatus.SUCCESS
 
             elapsed_ms = (time.monotonic() - start) * 1000
             return AgentResult(
                 agent_name=self.name,
-                status=AgentStatus.SUCCESS,
+                status=status,
                 output=plan,
                 reasoning_summary=reasoning,
                 duration_ms=elapsed_ms,
