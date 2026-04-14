@@ -210,7 +210,7 @@ def test_workflow_kind_is_stateful(simple_http_flow: Flow) -> None:
 
 @pytest.mark.parametrize(
     "connector_type",
-    ["email", "vm", "file", "generic"],
+    ["generic"],
 )
 def test_unsupported_connector_emits_gap(connector_type: str) -> None:
     """Unsupported connector types emit a MigrationGap."""
@@ -232,8 +232,54 @@ def test_unsupported_connector_emits_gap(connector_type: str) -> None:
     assert any("connector:" in n for n in gap_names)
 
 
-def test_flow_ref_emits_gap() -> None:
-    """FLOW_REF processor emits a MigrationGap."""
+@pytest.mark.parametrize(
+    "connector_type",
+    ["email", "vm"],
+)
+def test_partial_support_connector_emits_gap(connector_type: str) -> None:
+    """Partially supported connectors (email, vm) emit a MigrationGap."""
+    from m2la_ir.enums import ConnectorType
+    from m2la_ir.models import ConnectorOperation
+
+    ct = ConnectorType(connector_type)
+    step = ConnectorOperation(connector_type=ct, operation="send", config={})
+    flow = make_flow(
+        name="partial-support-flow",
+        kind=FlowKind.FLOW,
+        trigger=make_http_trigger(),
+        steps=[step],
+    )
+    _, gaps = generate_workflow(flow)
+
+    assert gaps, f"Expected a partial-support gap for '{connector_type}'"
+    assert any(g.category.value == "partial_support" for g in gaps)
+
+
+@pytest.mark.parametrize(
+    "connector_type",
+    ["file", "ftp", "sftp"],
+)
+def test_supported_connector_no_gap(connector_type: str) -> None:
+    """Supported file/FTP/SFTP connectors produce no migration gaps."""
+    from m2la_ir.enums import ConnectorType
+    from m2la_ir.models import ConnectorOperation
+
+    ct = ConnectorType(connector_type)
+    step = ConnectorOperation(connector_type=ct, operation="write", config={})
+    flow = make_flow(
+        name="supported-connector-flow",
+        kind=FlowKind.FLOW,
+        trigger=make_http_trigger(),
+        steps=[step],
+    )
+    _, gaps = generate_workflow(flow)
+
+    connector_gaps = [g for g in gaps if "connector:" in g.construct_name]
+    assert not connector_gaps, f"Expected no gaps for supported connector '{connector_type}'"
+
+
+def test_flow_ref_unresolved_emits_gap() -> None:
+    """FLOW_REF processor emits a MigrationGap when sub-flow is not found."""
     from m2la_ir.builders import make_processor
     from m2la_ir.enums import ProcessorType
 

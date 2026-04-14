@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from m2la_contracts.common import MigrationGap
-from m2la_ir.enums import ConnectorType
+from m2la_ir.enums import ConnectorType, FlowKind
 from m2la_ir.models import ConnectorOperation, Flow, MuleIR, Router, Scope
 
 from m2la_transform.models import ProjectArtifacts
@@ -53,6 +53,21 @@ _CONNECTOR_INFO: dict[ConnectorType, tuple[str, str, str]] = {
         "sftp_connection",
         "/serviceProviders/sftp",
         "SFTP Connection",
+    ),
+    ConnectorType.FILE: (
+        "filesystem_connection",
+        "/serviceProviders/fileSystem",
+        "File System Connection",
+    ),
+    ConnectorType.VM: (
+        "servicebus_connection",
+        "/serviceProviders/serviceBus",
+        "Service Bus Connection",
+    ),
+    ConnectorType.EMAIL: (
+        "office365_connection",
+        "/serviceProviders/office365",
+        "Office 365 Outlook Connection",
     ),
 }
 
@@ -174,11 +189,16 @@ def generate_project(
     # 4. .env — mock values only
     env_content = _ENV_CONTENT
 
-    # 5. Per-flow workflow generation
+    # 5. Build sub-flow lookup for flow-ref resolution
+    sub_flows: dict[str, Flow] = {
+        flow.name: flow for flow in ir.flows if flow.kind == FlowKind.SUB_FLOW
+    }
+
+    # 6. Per-flow workflow generation
     workflows: dict[str, dict[str, Any]] = {}
     for flow in ir.flows:
         workflow_name = _sanitize_workflow_name(flow.name)
-        workflow_dict, flow_gaps = generate_workflow(flow)
+        workflow_dict, flow_gaps = generate_workflow(flow, sub_flows=sub_flows)
         all_gaps.extend(flow_gaps)
         workflows[workflow_name] = workflow_dict
 
