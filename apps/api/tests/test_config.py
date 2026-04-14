@@ -15,7 +15,9 @@ class TestSettings:
         assert settings.port == 8000
         assert settings.log_level == "info"
         assert settings.debug is False
-        assert settings.api_key == ""
+        assert settings.api_token == ""
+        assert settings.foundry_endpoint == ""
+        assert settings.foundry_model == "gpt-4o"
 
     def test_env_override(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Environment variables should override defaults."""
@@ -23,13 +25,17 @@ class TestSettings:
         monkeypatch.setenv("M2LA_PORT", "9000")
         monkeypatch.setenv("M2LA_LOG_LEVEL", "debug")
         monkeypatch.setenv("M2LA_DEBUG", "true")
-        monkeypatch.setenv("M2LA_API_KEY", "test-secret-key")
+        monkeypatch.setenv("M2LA_API_TOKEN", "test-secret-key")
+        monkeypatch.setenv("M2LA_FOUNDRY_ENDPOINT", "https://my-foundry.openai.azure.com")
+        monkeypatch.setenv("M2LA_FOUNDRY_MODEL", "gpt-4o-mini")
         settings = Settings()
         assert settings.host == "0.0.0.0"
         assert settings.port == 9000
         assert settings.log_level == "debug"
         assert settings.debug is True
-        assert settings.api_key == "test-secret-key"
+        assert settings.api_token == "test-secret-key"
+        assert settings.foundry_endpoint == "https://my-foundry.openai.azure.com"
+        assert settings.foundry_model == "gpt-4o-mini"
 
     def test_partial_override(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Only overridden env vars should change; others keep defaults."""

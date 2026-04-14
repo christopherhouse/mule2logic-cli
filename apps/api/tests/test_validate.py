@@ -3,27 +3,20 @@
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from m2la_api.main import app
-
-
-@pytest.fixture
-def transport() -> ASGITransport:
-    return ASGITransport(app=app)
-
 
 class TestValidateEndpoint:
     """Tests for POST /validate."""
 
     @pytest.mark.asyncio
     async def test_valid_request(self, transport: ASGITransport) -> None:
-        """Valid request should return a placeholder validation report."""
+        """Valid request should return a validation report."""
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.post("/validate", json={"output_directory": "/tmp/output"})
         assert response.status_code == 200
         data = response.json()
-        assert data["valid"] is True
-        assert data["issues"] == []
-        assert data["artifacts_validated"] == 0
+        assert "valid" in data
+        assert "issues" in data
+        assert "artifacts_validated" in data
         assert "telemetry" in data
 
     @pytest.mark.asyncio

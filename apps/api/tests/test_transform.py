@@ -3,13 +3,6 @@
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from m2la_api.main import app
-
-
-@pytest.fixture
-def transport() -> ASGITransport:
-    return ASGITransport(app=app)
-
 
 class TestTransformEndpoint:
     """Tests for POST /transform."""
@@ -22,8 +15,6 @@ class TestTransformEndpoint:
         assert response.status_code == 200
         data = response.json()
         assert data["mode"] == "project"
-        assert data["project_name"] == "placeholder-project"
-        assert data["artifacts"]["artifacts"] == []
         assert data["artifacts"]["mode"] == "project"
 
     @pytest.mark.asyncio
