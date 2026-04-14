@@ -50,6 +50,18 @@ WORKFLOW_SCHEMA = (
     "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#"
 )
 
+# ── Named constants for generated Logic Apps expressions ──────────────────────
+
+# Placeholder expression for Until loops converted from until-successful.
+# Always evaluates to true so the loop relies solely on the count limit.
+# Must be reviewed and replaced with a real exit condition post-migration.
+UNTIL_LOOP_PLACEHOLDER_EXPR = "@equals(1, 1)"
+
+# Placeholder variable name for Switch actions converted from multi-branch
+# choice routers. The migrator cannot infer the correct switch expression —
+# users must set this to an appropriate Logic Apps expression post-migration.
+SWITCH_PLACEHOLDER_EXPR = "@variables('switchExpression')"
+
 # Map MuleSoft time units to Logic Apps recurrence frequency strings
 _TIME_UNIT_MAP: dict[str, str] = {
     "MILLISECONDS": "Second",
@@ -445,11 +457,10 @@ def _map_error_handlers(
         inner_actions, inner_gaps = _convert_steps(handler.steps, sub_flows)
         gaps.extend(inner_gaps)
 
-        # Determine runAfter status based on handler type
-        if handler.type == ErrorHandlerType.ON_ERROR_CONTINUE:
-            run_after_statuses = ["Failed", "TimedOut"]
-        else:  # ON_ERROR_PROPAGATE
-            run_after_statuses = ["Failed", "TimedOut"]
+        # Both handler types run on failure — Logic Apps doesn't distinguish
+        # between propagate/continue at the runAfter level; the difference is
+        # modeled via scope nesting and description annotations.
+        run_after_statuses = ["Failed", "TimedOut"]
 
         scope_action: dict[str, Any] = {
             "type": "Scope",
@@ -758,7 +769,7 @@ def _map_step(
             action = {
                 "type": "Until",
                 "actions": inner_actions,
-                "expression": "@equals(1, 1)",
+                "expression": UNTIL_LOOP_PLACEHOLDER_EXPR,
                 "limit": {
                     "count": max_retries,
                     "timeout": "PT1H",
@@ -928,7 +939,7 @@ def _map_choice_router(
 
     action = {
         "type": "Switch",
-        "expression": "@variables('switchExpression')",
+        "expression": SWITCH_PLACEHOLDER_EXPR,
         "cases": cases,
         "default": {"actions": default_actions},
         "runAfter": run_after,
