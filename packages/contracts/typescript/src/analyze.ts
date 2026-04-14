@@ -1,16 +1,23 @@
 /**
  * Analyze request/response contracts (spec §4, §5).
+ *
+ * Note: The analyze request is sent as multipart/form-data (file upload),
+ * not as a JSON body.  The AnalyzeRequest type below describes the
+ * logical fields; the actual upload is handled by the CLI's api-client.
  */
 
 import type { ConstructCount, MigrationGap, Warning } from "./common.js";
 import type { InputMode } from "./enums.js";
 import type { TelemetryContext } from "./telemetry.js";
 
-/** Request to analyze a MuleSoft project or single flow. */
+/**
+ * Logical request to analyze a MuleSoft project or single flow.
+ *
+ * In practice, the project/flow data is uploaded as a file via
+ * multipart/form-data.  The `mode` and telemetry are sent as form fields.
+ */
 export interface AnalyzeRequest {
-  /** Path to MuleSoft project root directory or single flow XML file. */
-  input_path: string;
-  /** Input mode; auto-detected from path if not specified. */
+  /** Input mode; auto-detected from filename if not specified. */
   mode?: InputMode | null;
   /** Telemetry context for trace propagation. */
   telemetry?: TelemetryContext | null;

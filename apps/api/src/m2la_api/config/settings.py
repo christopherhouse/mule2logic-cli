@@ -15,8 +15,11 @@ class Settings(BaseSettings):
     port: int = 8000
     log_level: str = "info"
     debug: bool = False
-    # POC API key auth – will be replaced by Entra ID authentication.
-    api_key: str = ""
+    # POC API token auth – will be replaced by Entra ID authentication.
+    api_token: str = ""
+    # Azure AI Foundry connection settings.
+    foundry_endpoint: str = ""
+    foundry_model: str = "gpt-4o"
 
     model_config = {"env_prefix": "M2LA_"}
 

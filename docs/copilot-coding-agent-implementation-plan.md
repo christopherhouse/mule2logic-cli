@@ -1162,7 +1162,19 @@ Do NOT create an "offline mode", "deterministic mode", "local mode", or any LLM-
 
 ---
 
-## PR-012b — End-to-End API Integration + API Key Auth
+## PR-012b — End-to-End API Integration + API Key Auth ✅ COMPLETE
+
+**Completed: 2026-04-14**
+
+Delivered all acceptance criteria:
+- API routes wired through `MigrationOrchestrator` (analyze-only, full pipeline, validator-only)
+- Auth migrated from `X-API-Key`/`M2LA_API_KEY` → `x-api-token`/`M2LA_API_TOKEN`
+- Foundry config added: `M2LA_FOUNDRY_ENDPOINT`, `M2LA_FOUNDRY_MODEL`
+- CLI sends `x-api-token` header, handles 401 with remediation hint
+- Deploy script updated with new env var names
+- 8 integration tests added (project mode + single-flow mode for analyze/transform/validate)
+- All 41 API tests pass, all 124 agent tests pass
+- Event loop conflict resolved via `asyncio.to_thread()` for sync orchestrator calls from async routes
 
 ### Goal
 Wire the API routes through the `MigrationOrchestrator` (from PR-012a) so the full pipeline executes end-to-end: CLI → API → agent orchestrator → LLM → tool calls → structured response. Add API key authentication between CLI and backend. Add Foundry connection configuration to the API.

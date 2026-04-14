@@ -22,13 +22,32 @@ WORKDIR /build
 # will be valid after the venv is copied into the runtime stage.
 ENV UV_PROJECT_ENVIRONMENT=/app/.venv
 
-# Mirror the repo layout so the relative path in pyproject.toml
-# (../../packages/contracts) resolves correctly.
+# Mirror the repo layout so the relative paths in pyproject.toml resolve correctly.
 COPY packages/contracts/pyproject.toml packages/contracts/pyproject.toml
 COPY packages/contracts/src/ packages/contracts/src/
 
+# Copy all service packages that the API depends on
+COPY services/parser/pyproject.toml services/parser/pyproject.toml
+COPY services/parser/src/ services/parser/src/
+
+COPY services/ir/pyproject.toml services/ir/pyproject.toml
+COPY services/ir/src/ services/ir/src/
+
+COPY services/mapping-config/pyproject.toml services/mapping-config/pyproject.toml
+COPY services/mapping-config/src/ services/mapping-config/src/
+
+COPY services/transform/pyproject.toml services/transform/pyproject.toml
+COPY services/transform/src/ services/transform/src/
+
+COPY services/validate/pyproject.toml services/validate/pyproject.toml
+COPY services/validate/src/ services/validate/src/
+
+COPY services/agents/pyproject.toml services/agents/pyproject.toml
+COPY services/agents/src/ services/agents/src/
+
 # Copy API dependency files for layer caching
 COPY apps/api/pyproject.toml apps/api/pyproject.toml
+COPY apps/api/uv.lock apps/api/uv.lock
 
 # Sync dependencies (production only, no dev deps)
 # --no-editable ensures packages are installed into site-packages (not .pth

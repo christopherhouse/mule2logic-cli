@@ -16,7 +16,7 @@
 #   AI_SERVICES_ENDPOINT      — Azure AI Services endpoint for Foundry
 #
 # Optional:
-#   M2LA_API_KEY              — POC API key (from Bicep output; Entra auth replaces this)
+#   M2LA_API_TOKEN            — POC API token (from Bicep output; Entra auth replaces this)
 #   AI_MODEL                  — Model deployment name (default: gpt-4o)
 #   CAE_NAME                  — Container Apps Environment name
 #                               (default: cae-m2la-${ENVIRONMENT_NAME})
@@ -116,7 +116,7 @@ apply_defaults() {
   CAE_NAME="${CAE_NAME:-cae-m2la-${ENVIRONMENT_NAME}}"
   APP_NAME="${APP_NAME:-ca-m2la-api-${ENVIRONMENT_NAME}}"
   AI_MODEL="${AI_MODEL:-gpt-4o}"
-  M2LA_API_KEY="${M2LA_API_KEY:-}"  # POC only — will be replaced with Entra auth
+  M2LA_API_TOKEN="${M2LA_API_TOKEN:-}"  # POC only — will be replaced with Entra auth
   TARGET_PORT="${TARGET_PORT:-8000}"
   CPU="${CPU:-0.5}"
   MEMORY="${MEMORY:-1Gi}"
@@ -137,7 +137,7 @@ print_summary() {
   echo -e "  ${ICON_LOCK}  ${BOLD}Identity${RESET}      UAMI (${UAMI_CLIENT_ID})"
   echo -e "  ${ICON_CHART}  ${BOLD}Resources${RESET}     ${CPU} vCPU / ${MEMORY}"
   echo -e "  ${ICON_CHART}  ${BOLD}Scale${RESET}         ${MIN_REPLICAS}–${MAX_REPLICAS} replicas"
-  echo -e "  ${ICON_LOCK}  ${BOLD}API Key${RESET}       ${M2LA_API_KEY:+configured}${M2LA_API_KEY:-not set}"
+  echo -e "  ${ICON_LOCK}  ${BOLD}API Token${RESET}     $( [ -n "${M2LA_API_TOKEN}" ] && echo "configured" || echo "not set" )"
   echo -e "  ${MAGENTA}${BOLD}     RG${RESET}           ${RESOURCE_GROUP}"
   echo ""
 }
@@ -182,10 +182,10 @@ create_app() {
     --env-vars \
       "APPLICATIONINSIGHTS_CONNECTION_STRING=${APP_INSIGHTS_CONN_STRING}" \
       "AZURE_CLIENT_ID=${UAMI_CLIENT_ID}" \
-      "AZURE_AI_FOUNDRY_ENDPOINT=${AI_SERVICES_ENDPOINT}" \
-      "AZURE_AI_MODEL=${AI_MODEL}" \
+      "M2LA_FOUNDRY_ENDPOINT=${AI_SERVICES_ENDPOINT}" \
+      "M2LA_FOUNDRY_MODEL=${AI_MODEL}" \
       "ENVIRONMENT=${ENVIRONMENT_NAME}" \
-      "M2LA_API_KEY=${M2LA_API_KEY}" \
+      "M2LA_API_TOKEN=${M2LA_API_TOKEN}" \
     --tags "project=mule2logic" "environment=${ENVIRONMENT_NAME}" "managedBy=script" \
     --output none
 
@@ -225,10 +225,10 @@ update_app() {
     --set-env-vars \
       "APPLICATIONINSIGHTS_CONNECTION_STRING=${APP_INSIGHTS_CONN_STRING}" \
       "AZURE_CLIENT_ID=${UAMI_CLIENT_ID}" \
-      "AZURE_AI_FOUNDRY_ENDPOINT=${AI_SERVICES_ENDPOINT}" \
-      "AZURE_AI_MODEL=${AI_MODEL}" \
+      "M2LA_FOUNDRY_ENDPOINT=${AI_SERVICES_ENDPOINT}" \
+      "M2LA_FOUNDRY_MODEL=${AI_MODEL}" \
       "ENVIRONMENT=${ENVIRONMENT_NAME}" \
-      "M2LA_API_KEY=${M2LA_API_KEY}" \
+      "M2LA_API_TOKEN=${M2LA_API_TOKEN}" \
     --output none
 
   success "Container App updated"

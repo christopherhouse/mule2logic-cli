@@ -83,7 +83,7 @@ def parse_pom(pom_path: Path) -> tuple[ProjectMetadata | None, list[Warning]]:
     return metadata, warnings
 
 
-def _get_text(element: ET.Element, tag: str) -> str | None:
+def _get_text(element: StdET.Element, tag: str) -> str | None:
     """Get text content of a child element, or None if not found."""
     child = element.find(tag)
     if child is not None and child.text:
@@ -91,7 +91,7 @@ def _get_text(element: ET.Element, tag: str) -> str | None:
     return None
 
 
-def _extract_mule_version(root: ET.Element) -> str | None:
+def _extract_mule_version(root: StdET.Element) -> str | None:
     """Extract Mule version from POM properties."""
     # Look in <properties>
     for props_tag in [f"{_POM_NS}properties", "properties"]:
@@ -105,7 +105,7 @@ def _extract_mule_version(root: ET.Element) -> str | None:
     return None
 
 
-def _extract_connector_deps(root: ET.Element) -> list[str]:
+def _extract_connector_deps(root: StdET.Element) -> list[str]:
     """Extract Mule connector dependency artifactIds from POM."""
     connectors: list[str] = []
 

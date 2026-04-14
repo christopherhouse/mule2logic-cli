@@ -130,7 +130,7 @@ def parse_mule_xml(
     return flows, subflows, global_elements, connector_configs, flow_file, warnings
 
 
-def extract_property_placeholders(element: ET.Element) -> list[str]:
+def extract_property_placeholders(element: StdET.Element) -> list[str]:
     """Extract all ${property.name} placeholders from an element and its descendants.
 
     Args:
@@ -188,7 +188,7 @@ def extract_flow_refs(flows: list[MuleFlow], subflows: list[MuleSubFlow]) -> set
     return refs
 
 
-def _parse_flow(element: ET.Element, source_file: str, ns_map: dict[str, str | None]) -> MuleFlow:
+def _parse_flow(element: StdET.Element, source_file: str, ns_map: dict[str, str | None]) -> MuleFlow:
     """Parse a <flow> element into a MuleFlow model."""
     name = element.attrib.get("name", "unnamed")
     trigger: ProcessorElement | None = None
@@ -217,7 +217,7 @@ def _parse_flow(element: ET.Element, source_file: str, ns_map: dict[str, str | N
     )
 
 
-def _parse_subflow(element: ET.Element, source_file: str, ns_map: dict[str, str | None]) -> MuleSubFlow:
+def _parse_subflow(element: StdET.Element, source_file: str, ns_map: dict[str, str | None]) -> MuleSubFlow:
     """Parse a <sub-flow> element into a MuleSubFlow model."""
     name = element.attrib.get("name", "unnamed")
     processors: list[ProcessorElement] = []
@@ -230,7 +230,7 @@ def _parse_subflow(element: ET.Element, source_file: str, ns_map: dict[str, str 
     return MuleSubFlow(name=name, source_file=source_file, processors=processors)
 
 
-def _parse_error_handler(element: ET.Element, ns_map: dict[str, str | None]) -> ErrorHandler:
+def _parse_error_handler(element: StdET.Element, ns_map: dict[str, str | None]) -> ErrorHandler:
     """Parse an <error-handler> block."""
     strategies: list[ProcessorElement] = []
     for child in element:
@@ -242,7 +242,7 @@ def _parse_error_handler(element: ET.Element, ns_map: dict[str, str | None]) -> 
     return ErrorHandler(strategies=strategies)
 
 
-def _element_to_processor(element: ET.Element, ns_prefix: str | None) -> ProcessorElement:
+def _element_to_processor(element: StdET.Element, ns_prefix: str | None) -> ProcessorElement:
     """Convert an XML element to a ProcessorElement model."""
     local = _local_name(element.tag)
     config_ref = element.attrib.get("config-ref")
@@ -278,7 +278,7 @@ def _namespace_uri(tag: str) -> str:
     return ""
 
 
-def _build_namespace_prefix_map(root: ET.Element) -> dict[str, str | None]:
+def _build_namespace_prefix_map(root: StdET.Element) -> dict[str, str | None]:
     """Build a mapping from namespace URI to prefix by inspecting the root element.
 
     Note: ElementTree doesn't preserve namespace prefixes natively.
@@ -321,7 +321,7 @@ def _build_namespace_prefix_map(root: ET.Element) -> dict[str, str | None]:
     return ns_map
 
 
-def _extract_property_refs_from_element(element: ET.Element) -> list[str]:
+def _extract_property_refs_from_element(element: StdET.Element) -> list[str]:
     """Extract all ${property.name} references from an element and its descendants."""
     props: set[str] = set()
 

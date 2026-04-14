@@ -7,11 +7,25 @@ dependencies = [
     "fastapi",
     "uvicorn[standard]",
     "m2la-contracts",
+    "m2la-parser",
+    "m2la-ir",
+    "m2la-mapping-config",
+    "m2la-transform",
+    "m2la-validate",
+    "m2la-agents",
     "pydantic-settings",
+    "azure-identity",
+    "python-multipart>=0.0.26",
 ]
 
 [tool.uv.sources]
 m2la-contracts = { path = "../../packages/contracts", editable = true }
+m2la-parser = { path = "../../services/parser", editable = true }
+m2la-ir = { path = "../../services/ir", editable = true }
+m2la-mapping-config = { path = "../../services/mapping-config", editable = true }
+m2la-transform = { path = "../../services/transform", editable = true }
+m2la-validate = { path = "../../services/validate", editable = true }
+m2la-agents = { path = "../../services/agents", editable = true }
 
 [dependency-groups]
 dev = [
@@ -37,4 +51,5 @@ select = ["E", "F", "I", "W", "UP"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["tests"]
 asyncio_mode = "auto"

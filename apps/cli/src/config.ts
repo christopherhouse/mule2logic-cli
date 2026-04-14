@@ -9,6 +9,8 @@ export interface CliConfig {
   backendUrl: string;
   /** Enable verbose output. */
   verbose: boolean;
+  /** API token for backend authentication. */
+  apiToken?: string;
 }
 
 const DEFAULT_BACKEND_URL = "http://localhost:8000";
@@ -21,5 +23,6 @@ export function getConfig(overrides: Partial<CliConfig> = {}): CliConfig {
   return {
     backendUrl: overrides.backendUrl ?? process.env.M2LA_BACKEND_URL ?? DEFAULT_BACKEND_URL,
     verbose: overrides.verbose ?? process.env.M2LA_VERBOSE === "true",
+    apiToken: overrides.apiToken ?? process.env.M2LA_API_TOKEN ?? undefined,
   };
 }
