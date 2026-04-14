@@ -13,7 +13,7 @@
  * Call `initTelemetry()` once at CLI startup before executing commands.
  */
 
-import { trace, metrics, context, propagation, type Span } from "@opentelemetry/api";
+import { trace, metrics, context, propagation, type Span, type Tracer, type Meter } from "@opentelemetry/api";
 
 let telemetryInitialized = false;
 let telemetryEnabled = false;
@@ -71,14 +71,14 @@ async function initAzureMonitor(connectionString: string): Promise<void> {
 /**
  * Get a tracer instance for creating spans.
  */
-export function getTracer() {
+export function getTracer(): Tracer {
   return trace.getTracer("m2la-cli", "0.1.0");
 }
 
 /**
  * Get a meter instance for creating metrics.
  */
-export function getMeter() {
+export function getMeter(): Meter {
   return metrics.getMeter("m2la-cli", "0.1.0");
 }
 

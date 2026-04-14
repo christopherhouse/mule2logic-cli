@@ -11,7 +11,7 @@ import {
   withSpan,
   getPropagationHeaders,
 } from "../src/telemetry/index.js";
-import { trace } from "@opentelemetry/api";
+import { trace, type Tracer } from "@opentelemetry/api";
 
 describe("Telemetry", () => {
   const originalEnv = process.env.APPLICATIONINSIGHTS_CONNECTION_STRING;
@@ -125,7 +125,7 @@ describe("Telemetry", () => {
         }),
       };
 
-      vi.spyOn(trace, "getTracer").mockReturnValue(tracerMock as any);
+      vi.spyOn(trace, "getTracer").mockReturnValue(tracerMock as unknown as Tracer);
 
       await withSpan("test.span", async () => {
         return "success";
@@ -150,7 +150,7 @@ describe("Telemetry", () => {
         }),
       };
 
-      vi.spyOn(trace, "getTracer").mockReturnValue(tracerMock as any);
+      vi.spyOn(trace, "getTracer").mockReturnValue(tracerMock as unknown as Tracer);
 
       await expect(
         withSpan("test.span", async () => {
