@@ -1,14 +1,21 @@
 /**
  * Validation request/report contracts.
+ *
+ * Note: The validate request is sent as multipart/form-data (file upload),
+ * not as a JSON body.  The ValidateRequest type below describes the
+ * logical fields; the actual upload is handled by the CLI's api-client.
  */
 
 import type { Severity } from "./enums.js";
 import type { TelemetryContext } from "./telemetry.js";
 
-/** Request to validate generated Logic Apps artifacts. */
+/**
+ * Logical request to validate generated Logic Apps artifacts.
+ *
+ * In practice, the output artifacts are uploaded as a zip file via
+ * multipart/form-data.  The telemetry is sent as a form field.
+ */
 export interface ValidateRequest {
-  /** Path to the output directory containing generated artifacts. */
-  output_directory: string;
   /** Telemetry context for trace propagation. */
   telemetry?: TelemetryContext | null;
 }

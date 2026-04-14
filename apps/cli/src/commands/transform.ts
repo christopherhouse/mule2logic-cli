@@ -3,9 +3,9 @@
  * into Logic Apps Standard artifacts.
  */
 import { Command } from "commander";
-import type { TransformRequest } from "@m2la/contracts";
 import { detectInputMode } from "../services/input-detector.js";
 import { validateProjectMode, validateSingleFlowMode } from "../services/input-validator.js";
+import { packageProjectDir, packageSingleFlow } from "../services/project-packager.js";
 import { ApiClient } from "../services/api-client.js";
 import { getConfig } from "../config.js";
 import { printModeIndicator, printTransformResult, createSpinner } from "../ui/output.js";
@@ -35,18 +35,19 @@ export function createTransformCommand(): Command {
           await validateSingleFlowMode(inputPath);
         }
 
-        // Call backend
-        const spinner = createSpinner("Transforming...");
+        // Package input for upload
+        const spinner = createSpinner("Packaging input...");
         spinner.start();
 
-        const client = new ApiClient(config.backendUrl, config.apiToken);
-        const request: TransformRequest = {
-          input_path: inputPath,
-          mode,
-          output_directory: options.output,
-        };
+        const pkg = mode === "project"
+          ? await packageProjectDir(inputPath)
+          : await packageSingleFlow(inputPath);
 
-        const result = await client.transform(request);
+        spinner.text = "Transforming...";
+
+        // Call backend with file upload
+        const client = new ApiClient(config.backendUrl, config.apiToken);
+        const result = await client.transform(pkg, mode, options.output);
         spinner.succeed("  Transformation complete!");
 
         printTransformResult(result);

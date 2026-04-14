@@ -4,6 +4,7 @@
 import { Command } from "commander";
 import { stat } from "node:fs/promises";
 import { resolve } from "node:path";
+import { packageProjectDir } from "../services/project-packager.js";
 import { ApiClient } from "../services/api-client.js";
 import { getConfig } from "../config.js";
 import { printValidationResult, createSpinner } from "../ui/output.js";
@@ -33,12 +34,17 @@ export function createValidateCommand(): Command {
           );
         }
 
-        // Call backend
-        const spinner = createSpinner("Validating...");
+        // Package output directory for upload
+        const spinner = createSpinner("Packaging output...");
         spinner.start();
 
+        const pkg = await packageProjectDir(resolvedPath);
+
+        spinner.text = "Validating...";
+
+        // Call backend with file upload
         const client = new ApiClient(config.backendUrl, config.apiToken);
-        const result = await client.validate(resolvedPath);
+        const result = await client.validate(pkg);
 
         if (result.valid) {
           spinner.succeed("  Validation complete!");

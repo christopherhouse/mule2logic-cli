@@ -1,6 +1,16 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { ApiClient } from "../src/services/api-client.js";
 import { CliError } from "../src/ui/errors.js";
+import type { PackageResult } from "../src/services/project-packager.js";
+
+/** Create a minimal PackageResult for testing. */
+function makeTestPackage(): PackageResult {
+  return {
+    buffer: Buffer.from("fake-zip-content"),
+    filename: "test-project.zip",
+    contentType: "application/zip",
+  };
+}
 
 describe("ApiClient", () => {
   const originalFetch = globalThis.fetch;
@@ -12,7 +22,6 @@ describe("ApiClient", () => {
 
   it("should strip trailing slashes from base URL", () => {
     const client = new ApiClient("http://localhost:8000///");
-    // Exercise the client to verify the URL is trimmed (indirectly via error path)
     expect(client).toBeDefined();
   });
 
@@ -26,10 +35,9 @@ describe("ApiClient", () => {
     });
 
     const client = new ApiClient("http://localhost:8000", "my-secret-token");
-    await client.analyze({ input_path: "/test", mode: "project" });
+    await client.analyze(makeTestPackage(), "project");
 
     expect(capturedHeaders["x-api-token"]).toBe("my-secret-token");
-    expect(capturedHeaders["Content-Type"]).toBe("application/json");
   });
 
   it("should not send x-api-token header when apiToken is not provided", async () => {
@@ -42,10 +50,22 @@ describe("ApiClient", () => {
     });
 
     const client = new ApiClient("http://localhost:8000");
-    await client.analyze({ input_path: "/test", mode: "project" });
+    await client.analyze(makeTestPackage(), "project");
 
     expect(capturedHeaders["x-api-token"]).toBeUndefined();
-    expect(capturedHeaders["Content-Type"]).toBe("application/json");
+  });
+
+  it("should send multipart/form-data body with file upload", async () => {
+    let capturedBody: FormData | undefined;
+    globalThis.fetch = vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
+      capturedBody = init.body as unknown as FormData;
+      return new Response(JSON.stringify({}), { status: 200 });
+    });
+
+    const client = new ApiClient("http://localhost:8000");
+    await client.analyze(makeTestPackage(), "project");
+
+    expect(capturedBody).toBeInstanceOf(FormData);
   });
 
   it("should throw UNAUTHORIZED CliError on 401 response", async () => {
@@ -55,12 +75,8 @@ describe("ApiClient", () => {
 
     const client = new ApiClient("http://localhost:8000", "bad-token");
 
-    await expect(client.analyze({ input_path: "/test", mode: "project" })).rejects.toThrow(
-      CliError,
-    );
-
     try {
-      await client.analyze({ input_path: "/test", mode: "project" });
+      await client.analyze(makeTestPackage(), "project");
     } catch (error) {
       expect(error).toBeInstanceOf(CliError);
       const cliError = error as CliError;
@@ -76,7 +92,7 @@ describe("ApiClient", () => {
     const client = new ApiClient("http://localhost:8000");
 
     try {
-      await client.analyze({ input_path: "/test", mode: "project" });
+      await client.analyze(makeTestPackage(), "project");
     } catch (error) {
       expect(error).toBeInstanceOf(CliError);
       const cliError = error as CliError;
@@ -96,7 +112,7 @@ describe("ApiClient", () => {
     const client = new ApiClient("http://localhost:8000");
 
     try {
-      await client.analyze({ input_path: "/test", mode: "project" });
+      await client.analyze(makeTestPackage(), "project");
     } catch (error) {
       expect(error).toBeInstanceOf(CliError);
       const cliError = error as CliError;

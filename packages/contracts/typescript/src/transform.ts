@@ -1,16 +1,24 @@
 /**
  * Transform request/response contracts (spec §4, §5).
+ *
+ * Note: The transform request is sent as multipart/form-data (file upload),
+ * not as a JSON body.  The TransformRequest type below describes the
+ * logical fields; the actual upload is handled by the CLI's api-client.
  */
 
 import type { ArtifactManifest, ConstructCount, MigrationGap, Warning } from "./common.js";
 import type { InputMode } from "./enums.js";
 import type { TelemetryContext } from "./telemetry.js";
 
-/** Request to transform a MuleSoft project or single flow into Logic Apps artifacts. */
+/**
+ * Logical request to transform a MuleSoft project or single flow into Logic Apps artifacts.
+ *
+ * In practice, the project/flow data is uploaded as a file via
+ * multipart/form-data.  The `mode`, `output_directory`, and telemetry
+ * are sent as form fields.
+ */
 export interface TransformRequest {
-  /** Path to MuleSoft project root directory or single flow XML file. */
-  input_path: string;
-  /** Input mode; auto-detected from path if not specified. */
+  /** Input mode; auto-detected from filename if not specified. */
   mode?: InputMode | null;
   /** Output directory for generated artifacts; defaults to ./output if not specified. */
   output_directory?: string | null;
