@@ -49,6 +49,10 @@ async def extract_project_upload(file: UploadFile) -> Path:
                 member_path = Path(member)
                 if member_path.is_absolute() or ".." in member_path.parts:
                     raise UploadError(f"Zip contains unsafe path: {member}")
+                # Extra safety: verify resolved path stays within extract_dir
+                resolved = (extract_dir / member).resolve()
+                if not str(resolved).startswith(str(extract_dir.resolve())):
+                    raise UploadError(f"Zip contains path that escapes extract directory: {member}")
             zf.extractall(extract_dir)
 
         zip_path.unlink()

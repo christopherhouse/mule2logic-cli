@@ -9,24 +9,19 @@ ValidatorAgent pipeline, and the temp directory is cleaned up afterward.
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
-import uuid
 from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, UploadFile
 from m2la_agents import MigrationOrchestrator, ValidatorAgent
-from m2la_contracts import TelemetryContext, ValidationReport
+from m2la_contracts import ValidationReport
 
 from m2la_api.dependencies import get_chat_client
 from m2la_api.models.errors import ApiError
+from m2la_api.routes.route_utils import parse_telemetry
 from m2la_api.services.result_mapper import map_validate_result
-from m2la_api.services.upload_handler import (
-    UploadError,
-    cleanup_upload,
-    extract_project_upload,
-)
+from m2la_api.services.upload_handler import UploadError, cleanup_upload, extract_project_upload
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +40,7 @@ async def validate(
     The server extracts the upload, runs the ValidatorAgent pipeline,
     and returns a validation report.
     """
-    telemetry = _parse_telemetry(telemetry_json)
+    telemetry = parse_telemetry(telemetry_json)
 
     output_path: Path | None = None
     try:
@@ -87,15 +82,3 @@ async def validate(
     finally:
         if output_path is not None:
             cleanup_upload(output_path)
-
-
-def _parse_telemetry(telemetry_json: str | None) -> TelemetryContext:
-    """Parse a telemetry JSON string or generate defaults."""
-    if telemetry_json:
-        data = json.loads(telemetry_json)
-        return TelemetryContext(**data)
-    return TelemetryContext(
-        trace_id=uuid.uuid4().hex[:16],
-        span_id=uuid.uuid4().hex[:8],
-        correlation_id=str(uuid.uuid4()),
-    )

@@ -9,29 +9,19 @@ full 5-agent pipeline, and the temp directory is cleaned up afterward.
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
-import uuid
 from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, UploadFile
 from m2la_agents import MigrationOrchestrator
-from m2la_contracts import (
-    InputMode,
-    TelemetryContext,
-    TransformResponse,
-)
+from m2la_contracts import TransformResponse
 
 from m2la_api.dependencies import get_chat_client
 from m2la_api.models.errors import ApiError
+from m2la_api.routes.route_utils import extract_upload, parse_telemetry, resolve_mode
 from m2la_api.services.result_mapper import map_transform_result
-from m2la_api.services.upload_handler import (
-    UploadError,
-    cleanup_upload,
-    extract_project_upload,
-    save_single_flow_upload,
-)
+from m2la_api.services.upload_handler import UploadError, cleanup_upload
 
 logger = logging.getLogger(__name__)
 
@@ -53,13 +43,17 @@ async def transform(
     full 5-agent pipeline (Analyzer → Planner → Transformer → Validator →
     RepairAdvisor), and returns the transformation results.
     """
-    resolved_mode = _resolve_mode(mode, file.filename)
+    try:
+        resolved_mode = resolve_mode(mode, file.filename)
+    except ValueError as exc:
+        raise ApiError(status_code=400, error_code="INVALID_MODE", message=str(exc)) from exc
+
     output_dir = output_directory or "./output"
-    telemetry = _parse_telemetry(telemetry_json)
+    telemetry = parse_telemetry(telemetry_json)
 
     input_path: Path | None = None
     try:
-        input_path = await _extract_upload(file, resolved_mode)
+        input_path = await extract_upload(file, resolved_mode)
 
         orchestrator = MigrationOrchestrator(
             client=chat_client,
@@ -98,36 +92,3 @@ async def transform(
     finally:
         if input_path is not None:
             cleanup_upload(input_path)
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
-def _resolve_mode(mode: str | None, filename: str | None) -> InputMode:
-    """Resolve the input mode from the form field or filename."""
-    if mode is not None:
-        return InputMode(mode)
-    if filename and filename.lower().endswith(".xml"):
-        return InputMode.SINGLE_FLOW
-    return InputMode.PROJECT
-
-
-def _parse_telemetry(telemetry_json: str | None) -> TelemetryContext:
-    """Parse a telemetry JSON string or generate defaults."""
-    if telemetry_json:
-        data = json.loads(telemetry_json)
-        return TelemetryContext(**data)
-    return TelemetryContext(
-        trace_id=uuid.uuid4().hex[:16],
-        span_id=uuid.uuid4().hex[:8],
-        correlation_id=str(uuid.uuid4()),
-    )
-
-
-async def _extract_upload(file: UploadFile, mode: InputMode) -> Path:
-    """Extract the uploaded file based on the resolved mode."""
-    if mode == InputMode.SINGLE_FLOW:
-        return await save_single_flow_upload(file)
-    return await extract_project_upload(file)
