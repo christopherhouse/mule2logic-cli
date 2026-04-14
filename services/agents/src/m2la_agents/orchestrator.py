@@ -22,6 +22,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import random
 import time
 import uuid
 from datetime import UTC, datetime
@@ -82,6 +83,63 @@ _llm_latency = _meter.create_histogram("m2la.llm.latency_ms", description="LLM c
 
 _MAX_REASONING_SUMMARY_LEN = 200
 
+# Default retry settings for transient Foundry / OpenAI errors
+_DEFAULT_MAX_RETRIES = 3
+_RETRY_BASE_DELAY_S = 1.0
+_RETRY_MAX_DELAY_S = 10.0
+
+
+def _is_retryable_error(exc: Exception) -> bool:
+    """Return *True* if *exc* is a transient Foundry/OpenAI error worth retrying.
+
+    The OpenAI Responses API occasionally returns a 400 with the message
+    ``"No tool call found for function call output with call_id …"``
+    when conversation context from one sequential agent leaks into the
+    next.  Rebuilding the workflow and retrying typically resolves the
+    issue because the new attempt starts with a fresh conversation state.
+
+    We also retry on ``ChatClientException`` wrapping HTTP 429 (rate
+    limit) or 5xx (server) status codes.
+    """
+    # agent_framework wraps OpenAI errors in ChatClientException
+    try:
+        from agent_framework.exceptions import ChatClientException
+    except ImportError:  # pragma: no cover — defensive
+        return False
+
+    if not isinstance(exc, ChatClientException):
+        return False
+
+    msg = str(exc).lower()
+
+    # The specific error from the problem statement
+    if "no tool call found for function call output" in msg:
+        return True
+
+    # Rate limiting
+    if "429" in msg or "rate limit" in msg:
+        return True
+
+    # Server errors (5xx)
+    for code in ("500", "502", "503", "504"):
+        if code in msg:
+            return True
+
+    return False
+
+
+def _retry_delay(attempt: int) -> float:
+    """Calculate exponential back-off delay with jitter.
+
+    ``attempt`` is 0-indexed.  The delay doubles each attempt, capped at
+    ``_RETRY_MAX_DELAY_S``, with ±25 % jitter to avoid thundering-herd
+    effects across concurrent requests.
+    """
+    base = _RETRY_BASE_DELAY_S * (2**attempt)
+    capped = min(base, _RETRY_MAX_DELAY_S)
+    jitter = capped * random.uniform(0.75, 1.25)  # noqa: S311 — not security-sensitive
+    return jitter
+
 
 class MigrationOrchestrator:
     """Runs the full migration pipeline through a sequence of LLM-backed agents.
@@ -89,6 +147,11 @@ class MigrationOrchestrator:
     Every migration request flows through the LLM via a
     ``SequentialBuilder`` workflow.  The ``client`` parameter (a
     ``FoundryChatClient`` or compatible) is **required**.
+
+    Transient errors from the Foundry / OpenAI backend (e.g. orphaned
+    tool-call IDs in the conversation context, rate limits, or 5xx
+    responses) are automatically retried up to ``max_retries`` times
+    with exponential back-off.
 
     Usage::
 
@@ -110,6 +173,7 @@ class MigrationOrchestrator:
         agents: list[BaseAgent] | None = None,
         include_repair: bool = True,
         client: Any,
+        max_retries: int = _DEFAULT_MAX_RETRIES,
     ) -> None:
         if agents is not None:
             self.agents = agents
@@ -125,6 +189,7 @@ class MigrationOrchestrator:
             self.agents = base
         self.include_repair = include_repair
         self.client = client
+        self.max_retries = max(0, max_retries)
 
     def run(
         self,
@@ -141,6 +206,11 @@ class MigrationOrchestrator:
 
         Always flows through the ``SequentialBuilder`` → LLM → tool
         calls path.  There is no offline bypass.
+
+        Transient Foundry / OpenAI errors are automatically retried up
+        to ``self.max_retries`` times.  Each retry rebuilds the
+        ``SequentialBuilder`` workflow from scratch so the conversation
+        context starts fresh.
         """
         cid = correlation_id or str(uuid.uuid4())
         pipeline_start = time.monotonic()
@@ -166,18 +236,6 @@ class MigrationOrchestrator:
                     final_output=None,
                 )
 
-            # Build MAF agents from our BaseAgent wrappers
-            maf_agents: list[Agent] = []
-            for agent in self.agents:
-                maf_agent = agent.build_maf_agent(self.client)
-                maf_agents.append(maf_agent)
-                logger.info("Built MAF agent: %s", agent.name)
-
-            # Build SequentialBuilder workflow
-            from agent_framework.orchestrations import SequentialBuilder
-
-            workflow = SequentialBuilder(participants=maf_agents).build()
-
             # Construct user message describing the migration task
             mode_str = input_mode.value if input_mode else "auto-detect"
             user_message = (
@@ -196,7 +254,7 @@ class MigrationOrchestrator:
                 est_prompt = estimate_message_tokens(messages)
                 _llm_estimated_prompt.add(est_prompt, {"agent_name": agent.name})
 
-            # Execute the workflow
+            # Execute the workflow with retry logic
             step_results: list[StepResult] = []
             try:
                 try:
@@ -213,7 +271,7 @@ class MigrationOrchestrator:
 
                 llm_start = time.monotonic()
                 step_results = asyncio.run(
-                    self._execute_workflow(workflow, user_message),
+                    self._execute_workflow_with_retries(user_message),
                 )
                 llm_elapsed = (time.monotonic() - llm_start) * 1000
                 _llm_calls.add(1, {"status": "success"})
@@ -224,6 +282,7 @@ class MigrationOrchestrator:
             except Exception:
                 _llm_calls.add(1, {"status": "error"})
                 logger.exception("Workflow execution failed")
+                raise
 
             # Emit per-agent metrics from step results
             for step in step_results:
@@ -270,6 +329,59 @@ class MigrationOrchestrator:
     # ------------------------------------------------------------------
     # Workflow execution
     # ------------------------------------------------------------------
+
+    def _build_workflow(self) -> Any:
+        """Build a fresh ``SequentialBuilder`` workflow.
+
+        A fresh workflow is created on every call so that the
+        conversation context is clean — this avoids stale tool-call IDs
+        from a previous attempt leaking into the new request.
+        """
+        from agent_framework.orchestrations import SequentialBuilder
+
+        maf_agents: list[Agent] = []
+        for agent in self.agents:
+            maf_agent = agent.build_maf_agent(self.client)
+            maf_agents.append(maf_agent)
+            logger.info("Built MAF agent: %s", agent.name)
+
+        return SequentialBuilder(participants=maf_agents).build()
+
+    async def _execute_workflow_with_retries(
+        self,
+        user_message: str,
+    ) -> list[StepResult]:
+        """Execute the workflow, retrying on transient Foundry errors.
+
+        On each attempt a **new** ``SequentialBuilder`` workflow is
+        constructed so the conversation context starts fresh.  This is
+        the key to resolving the "No tool call found for function call
+        output" error — stale ``call_id`` references from a previous
+        agent's tool invocations are not carried over.
+        """
+        last_exc: Exception | None = None
+
+        for attempt in range(1 + self.max_retries):
+            workflow = self._build_workflow()
+            try:
+                return await self._execute_workflow(workflow, user_message)
+            except Exception as exc:
+                if attempt < self.max_retries and _is_retryable_error(exc):
+                    last_exc = exc
+                    delay = _retry_delay(attempt)
+                    logger.warning(
+                        "Retryable Foundry error on attempt %d/%d, retrying in %.1fs: %s",
+                        attempt + 1,
+                        1 + self.max_retries,
+                        delay,
+                        exc,
+                    )
+                    await asyncio.sleep(delay)
+                else:
+                    raise
+
+        # Should never reach here, but satisfy type checker
+        raise last_exc  # type: ignore[misc]
 
     async def _execute_workflow(
         self,
