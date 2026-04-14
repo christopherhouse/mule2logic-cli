@@ -31,7 +31,7 @@ from m2la_contracts.enums import InputMode
 
 from m2la_agents.analyzer import AnalyzerAgent
 from m2la_agents.base import BaseAgent
-from m2la_agents.models import AgentContext, AgentResult, AgentStatus, OrchestrationResult, StepResult
+from m2la_agents.models import AgentResult, AgentStatus, OrchestrationResult, StepResult
 from m2la_agents.planner import PlannerAgent
 from m2la_agents.repair_advisor import RepairAdvisorAgent
 from m2la_agents.transformer import TransformerAgent
@@ -194,167 +194,79 @@ class MigrationOrchestrator:
     ) -> list[StepResult]:
         """Run the SequentialBuilder workflow and extract step results.
 
-        Captures ``executor_invoked`` / ``executor_completed`` events to
-        build :class:`StepResult` entries from tool call outputs that
-        flow through the LLM conversation.  Falls back to parsing the
-        final ``output`` event when executor events are unavailable.
+        Each agent in the sequential workflow calls a tool function and
+        returns the result as assistant text.  The final ``output`` event
+        contains the full conversation with one assistant message per
+        agent.  We parse those messages into :class:`StepResult` entries.
         """
-        steps: list[StepResult] = []
-        current_step_start: datetime | None = None
-        current_agent_name: str | None = None
         final_conversation: list[Any] = []
 
         async for event in workflow.run(user_message, stream=True):
-            if event.type == "executor_invoked":
-                current_step_start = datetime.now(UTC)
-                # The agent name is in the event data or can be inferred
-                if hasattr(event, "participant") and event.participant:
-                    current_agent_name = getattr(event.participant, "name", None)
-
-            elif event.type == "executor_completed":
-                step_end = datetime.now(UTC)
-                start = current_step_start or step_end
-
-                # Extract the agent response from the event
-                agent_result = self._extract_agent_result(
-                    event,
-                    current_agent_name,
-                )
-
-                if agent_result:
-                    steps.append(
-                        StepResult(
-                            step_name=agent_result.agent_name,
-                            agent_result=agent_result,
-                            started_at=start,
-                            completed_at=step_end,
-                        )
-                    )
-
-                current_step_start = None
-                current_agent_name = None
-
-            elif event.type == "output":
+            if event.type == "output":
                 final_conversation = event.data if event.data else []
 
-        # If we didn't capture steps from executor events, parse the
-        # final conversation for tool results.
-        if not steps and final_conversation:
-            steps = self._parse_conversation_steps(final_conversation)
+        return self._parse_conversation_steps(final_conversation)
 
-        return steps
-
-    @staticmethod
-    def _extract_agent_result(
-        event: Any,
-        agent_name: str | None,
-    ) -> AgentResult | None:
-        """Build an ``AgentResult`` from an ``executor_completed`` event."""
-        data = getattr(event, "data", None)
-        name = agent_name or "UnknownAgent"
-
-        # Try to get the response text / tool results
-        if data is None:
-            return AgentResult(
-                agent_name=name,
-                status=AgentStatus.SUCCESS,
-                reasoning_summary="Step completed",
-            )
-
-        # If data is an AgentResponse, extract messages
-        messages = getattr(data, "messages", None)
-        if messages is None and hasattr(data, "text"):
-            return AgentResult(
-                agent_name=name,
-                status=AgentStatus.SUCCESS,
-                output=data.text,
-                reasoning_summary=str(data.text)[:200] if data.text else "Completed",
-            )
-
-        # Parse function results from messages
-        return MigrationOrchestrator._result_from_messages(
-            messages or [],
-            name,
-        )
-
-    @staticmethod
-    def _result_from_messages(
-        messages: list[Any],
-        agent_name: str,
-    ) -> AgentResult:
-        """Parse tool call results and text from a message list."""
-        tool_outputs: list[Any] = []
-        reasoning = ""
-
-        for msg in messages:
-            if not hasattr(msg, "contents") or not msg.contents:
-                continue
-            for content in msg.contents:
-                if getattr(content, "type", "") == "function_result":
-                    raw = getattr(content, "result", "")
-                    try:
-                        parsed = json.loads(raw) if isinstance(raw, str) else raw
-                    except (json.JSONDecodeError, TypeError):
-                        parsed = raw
-                    tool_outputs.append(parsed)
-                elif getattr(content, "type", "") == "text":
-                    text = getattr(content, "text", "")
-                    if text:
-                        reasoning = text
-
-        output = tool_outputs[0] if len(tool_outputs) == 1 else (tool_outputs or None)
-        status = AgentStatus.SUCCESS
-        error_message: str | None = None
-
-        # Check for failure indicators
-        if isinstance(output, dict):
-            if output.get("valid") is False:
-                status = AgentStatus.PARTIAL
-            if "error" in output:
-                status = AgentStatus.FAILURE
-                error_message = str(output["error"])
-
-        return AgentResult(
-            agent_name=agent_name,
-            status=status,
-            output=output,
-            reasoning_summary=reasoning[:200] if reasoning else f"{agent_name} completed",
-            error_message=error_message,
-        )
-
-    @staticmethod
     def _parse_conversation_steps(
+        self,
         conversation: list[Any],
     ) -> list[StepResult]:
-        """Fallback: parse the final conversation for tool results."""
-        steps: list[StepResult] = []
+        """Parse the final conversation into StepResult entries.
+
+        Each assistant message in the conversation corresponds to one
+        agent's tool output.  We match them to our ``self.agents`` list
+        by position.
+        """
         now = datetime.now(UTC)
+        steps: list[StepResult] = []
+        agent_idx = 0
 
         for msg in conversation:
-            if not hasattr(msg, "contents") or not msg.contents:
+            role = getattr(msg, "role", "")
+            if role != "assistant":
                 continue
-            for content in msg.contents:
-                if getattr(content, "type", "") == "function_result":
-                    call_id = getattr(content, "call_id", "unknown")
-                    raw = getattr(content, "result", "")
-                    try:
-                        parsed = json.loads(raw) if isinstance(raw, str) else raw
-                    except (json.JSONDecodeError, TypeError):
-                        parsed = raw
 
-                    agent_result = AgentResult(
-                        agent_name=call_id,
-                        status=AgentStatus.SUCCESS,
-                        output=parsed,
-                        reasoning_summary=f"Tool result for {call_id}",
-                    )
-                    steps.append(
-                        StepResult(
-                            step_name=call_id,
-                            agent_result=agent_result,
-                            started_at=now,
-                            completed_at=now,
-                        )
-                    )
+            text = getattr(msg, "text", "") or ""
+            agent_name = self.agents[agent_idx].name if agent_idx < len(self.agents) else f"Agent-{agent_idx}"
+            agent_idx += 1
+
+            # Try to parse the tool output as JSON
+            output: Any = None
+            status = AgentStatus.SUCCESS
+            error_message: str | None = None
+
+            try:
+                parsed = json.loads(text)
+                output = parsed
+
+                # Check for failure indicators in the tool output
+                if isinstance(parsed, dict):
+                    if "error" in parsed:
+                        status = AgentStatus.FAILURE
+                        error_message = str(parsed["error"])
+                    elif parsed.get("valid") is False:
+                        status = AgentStatus.PARTIAL
+            except (json.JSONDecodeError, TypeError):
+                output = text if text else None
+
+            agent_result = AgentResult(
+                agent_name=agent_name,
+                status=status,
+                output=output,
+                reasoning_summary=text[:200] if text else f"{agent_name} completed",
+                error_message=error_message,
+            )
+            steps.append(
+                StepResult(
+                    step_name=agent_name,
+                    agent_result=agent_result,
+                    started_at=now,
+                    completed_at=now,
+                )
+            )
+
+            # Stop pipeline on failure
+            if status == AgentStatus.FAILURE:
+                break
 
         return steps

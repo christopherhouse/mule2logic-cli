@@ -273,9 +273,7 @@ class TestOrchestratorIntegration:
         assert result.correlation_id
         assert result.total_duration_ms > 0
 
-    def test_project_pipeline(
-        self, hello_world_project: Path, tmp_path: Path, mock_client: MockChatClient
-    ) -> None:
+    def test_project_pipeline(self, hello_world_project: Path, tmp_path: Path, mock_client: MockChatClient) -> None:
         """Full pipeline with a project should complete."""
         orchestrator = MigrationOrchestrator(include_repair=True, client=mock_client)
 
@@ -305,9 +303,7 @@ class TestOrchestratorIntegration:
 
         assert result.correlation_id
 
-    def test_pipeline_correlation_id_consistency(
-        self, standalone_flow_xml: Path, mock_client: MockChatClient
-    ) -> None:
+    def test_pipeline_correlation_id_consistency(self, standalone_flow_xml: Path, mock_client: MockChatClient) -> None:
         """Correlation ID should be preserved through the pipeline."""
         orchestrator = MigrationOrchestrator(client=mock_client)
 

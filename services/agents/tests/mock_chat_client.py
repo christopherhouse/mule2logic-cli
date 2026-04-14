@@ -4,14 +4,14 @@ This module provides :class:`MockChatClient`, a lightweight implementation of
 the ``SupportsChatGetResponse`` protocol from the Microsoft Agent Framework.
 
 When used as the ``client`` parameter to ``Agent(client=..., ...)``, it
-simulates the LLM's tool-calling behaviour:
+simulates the LLM's tool-calling behaviour by **directly invoking** the
+first available tool function and returning the result as an assistant
+text message.
 
-1. On the **first** call, it inspects the tool definitions passed via
-   ``options`` and emits a ``function_call`` content item for the first
-   available tool.  The ``FunctionInvocationLayer`` middleware inside
-   ``Agent`` then invokes the actual Python function.
-2. On the **second** call (after the function result has been appended to
-   the conversation), it returns a text summary of the tool result.
+Because ``MockChatClient`` is not a ``BaseChatClient`` subclass, the MAF
+``Agent`` does not apply the ``FunctionInvocationLayer`` middleware.
+Instead, the mock calls the tool's underlying Python function itself and
+wraps the return value in a ``ChatResponse``.
 
 This is **test-only** infrastructure.  It is not a product feature, not an
 "offline mode", and must not appear in production code paths.
@@ -31,8 +31,8 @@ class MockChatClient:
     """Simulates LLM tool-calling for tests.
 
     Implements the ``SupportsChatGetResponse`` protocol via duck typing.
-    The Agent's ``FunctionInvocationLayer`` handles the actual tool
-    invocation after receiving the ``function_call`` content we return.
+    Directly calls registered tool functions and returns their output as
+    assistant text — no real LLM round-trip.
     """
 
     additional_properties: dict[str, Any]
@@ -58,28 +58,20 @@ class MockChatClient:
     ) -> Any:
         """Return an awaitable ``ChatResponse`` or a ``ResponseStream``.
 
-        On the first invocation (no function results in messages yet),
-        returns a ``function_call`` for the first available tool so the
-        Agent middleware invokes the real tool function.
-
-        On subsequent invocations (function results present), returns a
-        plain text summary.
+        Inspects the registered tools from *options*, calls the first
+        tool function directly, and returns its result as an assistant
+        text message.
         """
         self.call_count += 1
 
-        # Check if there are already function results in the conversation
-        has_function_result = any(
-            any(c.type == "function_result" for c in msg.contents) for msg in messages if msg.contents
-        )
+        # Extract tool objects (FunctionTool instances) from options
+        tool_objects = self._extract_tool_objects(options)
 
-        # Extract tool definitions from options (if available)
-        tool_defs = self._extract_tool_defs(options)
-
-        if not has_function_result and tool_defs:
-            # First call: request a tool invocation
-            response = self._make_function_call_response(messages, tool_defs)
+        if tool_objects:
+            # Call the first tool and return the result as text
+            response = self._invoke_tool_and_respond(messages, tool_objects)
         else:
-            # Second call (or no tools): return text summary
+            # No tools — return a simple text response
             response = self._make_text_response(messages)
 
         if stream:
@@ -91,93 +83,58 @@ class MockChatClient:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _extract_tool_defs(options: Any | None) -> list[dict[str, Any]]:
-        """Pull tool schemas from the options dict passed by Agent."""
+    def _extract_tool_objects(options: Any | None) -> list[Any]:
+        """Pull tool objects from the options dict passed by Agent."""
         if options is None:
             return []
-        tools: list[dict[str, Any]] = []
         raw_tools = None
         if isinstance(options, dict):
             raw_tools = options.get("tools")
         elif hasattr(options, "get"):
             raw_tools = options.get("tools")  # type: ignore[union-attr]
-        if raw_tools is None:
+        if not raw_tools:
             return []
-        for t in raw_tools:
-            if isinstance(t, dict):
-                tools.append(t)
-            elif hasattr(t, "model_dump"):
-                tools.append(t.model_dump())
-            else:
-                tools.append({"type": "function", "function": {"name": str(t)}})
-        return tools
+        return list(raw_tools)
 
     @staticmethod
-    def _make_function_call_response(
+    def _invoke_tool_and_respond(
         messages: Sequence[Message],
-        tool_defs: list[dict[str, Any]],
+        tool_objects: list[Any],
     ) -> ChatResponse[Any]:
-        """Build a ``ChatResponse`` that requests invocation of the first tool."""
-        # Pick the first function tool
-        func_name = ""
-        func_params: dict[str, Any] = {}
+        """Call the first tool's underlying function and return the result."""
+        tool = tool_objects[0]
 
-        for td in tool_defs:
-            fn = td.get("function") or td
-            name = fn.get("name", "")
-            if name:
-                func_name = name
-                # Try to build minimal arguments from the schema
-                func_params = MockChatClient._infer_arguments(
-                    fn.get("parameters", {}),
-                    messages,
-                )
-                break
+        # Build arguments from the user message context
+        args = MockChatClient._infer_arguments_for_tool(tool, messages)
 
-        if not func_name:
-            # Fallback to text if no tools found
-            return MockChatClient._make_text_response(messages)
+        # Invoke the tool's underlying callable
+        func = getattr(tool, "func", None) or tool
+        try:
+            if callable(func):
+                result_str = func(**args)
+            else:
+                result_str = json.dumps({"error": "Tool is not callable"})
+        except Exception as exc:
+            result_str = json.dumps({"error": str(exc)})
 
-        call_content = Content.from_function_call(
-            call_id=f"mock-call-{func_name}",
-            name=func_name,
-            arguments=json.dumps(func_params),
-        )
-
-        response_msg = Message(
-            role="assistant",
-            contents=[call_content],
-        )
+        # Return the tool result as an assistant text message
+        response_msg = Message(role="assistant", contents=[str(result_str)])
 
         return ChatResponse(
             messages=[response_msg],
-            response_id="mock-response-fc",
-            finish_reason="tool_calls",
+            response_id="mock-tool-response",
+            finish_reason="stop",
         )
 
     @staticmethod
     def _make_text_response(messages: Sequence[Message]) -> ChatResponse[Any]:
-        """Build a plain text ``ChatResponse`` summarising tool results."""
-        # Collect any function results from conversation
-        summaries: list[str] = []
-        for msg in messages:
-            if not msg.contents:
-                continue
-            for content in msg.contents:
-                if content.type == "function_result":
-                    result_data = content.result if hasattr(content, "result") else ""
-                    summaries.append(str(result_data))
-
-        if summaries:
-            text = f"Tool execution completed. Results: {'; '.join(summaries)}"
-        else:
-            # No function results — just echo the last user message
-            last_user = ""
-            for msg in reversed(list(messages)):
-                if msg.role == "user" and msg.text:
-                    last_user = msg.text
-                    break
-            text = f"Acknowledged: {last_user}" if last_user else "Mock response — no tools available."
+        """Build a plain text ``ChatResponse`` when no tools are available."""
+        last_user = ""
+        for msg in reversed(list(messages)):
+            if msg.role == "user" and msg.text:
+                last_user = msg.text
+                break
+        text = f"Acknowledged: {last_user}" if last_user else "Mock response — no tools available."
 
         response_msg = Message(role="assistant", contents=[text])
 
@@ -188,29 +145,35 @@ class MockChatClient:
         )
 
     @staticmethod
-    def _infer_arguments(
-        param_schema: dict[str, Any],
+    def _infer_arguments_for_tool(
+        tool: Any,
         messages: Sequence[Message],
     ) -> dict[str, Any]:
-        """Build minimal arguments for a tool call from the message context.
+        """Build arguments for a tool call from the message context.
 
         Extracts ``input_path``, ``mode``, ``ir_json``, etc. from the
         user message so the deterministic tool functions receive real
         data to work with.
         """
+        # Get the parameter schema
+        params: dict[str, Any] = {}
+        if hasattr(tool, "parameters") and callable(tool.parameters):
+            try:
+                params = tool.parameters()
+            except Exception:
+                params = {}
+
         user_text = ""
         for msg in reversed(list(messages)):
             if msg.role == "user" and msg.text:
                 user_text = msg.text
                 break
 
-        # Parse the user message for common parameters
         args: dict[str, Any] = {}
-        props = param_schema.get("properties", {})
+        props = params.get("properties", {})
 
         for prop_name in props:
             if prop_name == "input_path":
-                # Extract path from user message
                 for line in user_text.split("\n"):
                     if "project at:" in line.lower() or "path" in line.lower():
                         path = line.split(":", 1)[-1].strip()
@@ -225,16 +188,14 @@ class MockChatClient:
                             args["mode"] = mode
                         break
             elif prop_name == "ir_json":
-                # Look for IR data in function results from prior messages
+                # Look for tool results from prior assistant messages
                 for msg in messages:
-                    if not msg.contents:
-                        continue
-                    for content in msg.contents:
-                        if content.type == "function_result" and hasattr(content, "result"):
-                            args["ir_json"] = str(content.result)
-                            break
-                    if "ir_json" in args:
+                    if msg.role == "assistant" and msg.text:
+                        # Previous tool output may contain IR-like data
+                        args["ir_json"] = msg.text
                         break
+                if "ir_json" not in args:
+                    args["ir_json"] = "{}"
             elif prop_name == "output_directory":
                 for line in user_text.split("\n"):
                     if "output directory:" in line.lower():
@@ -242,6 +203,10 @@ class MockChatClient:
                         if val != "default":
                             args["output_directory"] = val
                         break
+            elif prop_name == "validation_report_json":
+                args["validation_report_json"] = "[]"
+            elif prop_name == "migration_gaps_json":
+                args["migration_gaps_json"] = "[]"
 
         return args
 
