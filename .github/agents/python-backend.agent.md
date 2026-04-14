@@ -49,6 +49,12 @@ Before any work, read:
 - Propagate trace context through all service calls.
 - Use structured logging correlated with trace IDs.
 
+## AI/Agent Framework Constraint
+
+- The only approved AI/agent SDK is **Microsoft Agent Framework** (`agent-framework-core`, `agent-framework-foundry`).
+- **Do not use** `azure-ai-agents`, Semantic Kernel, AutoGen, LangChain, or any other AI agent framework.
+- Agent code lives in `services/agents/`. When working on agent code, prefer the `foundry-agent` custom agent.
+
 ## Output
 
 Always produce type-annotated, tested, ruff-clean Python code.
