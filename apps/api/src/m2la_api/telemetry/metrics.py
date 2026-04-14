@@ -1,8 +1,8 @@
 """Custom OpenTelemetry metrics for the m2la platform.
 
-All metric instruments are created lazily from a shared meter so that
-service code can ``import`` them without requiring the OTel SDK to be
-installed (the ``opentelemetry-api`` package provides no-op stubs).
+This module exposes shared metric instruments created from a shared meter.
+Service code can ``import`` them without requiring the full OTel SDK to be
+installed because the ``opentelemetry-api`` package provides no-op stubs.
 """
 
 from __future__ import annotations

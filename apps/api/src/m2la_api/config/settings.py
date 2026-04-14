@@ -20,9 +20,8 @@ class Settings(BaseSettings):
     # Azure AI Foundry connection settings.
     foundry_endpoint: str = ""
     foundry_model: str = "gpt-4o"
-    # OpenTelemetry / Azure Monitor settings.
-    # Read from APPLICATIONINSIGHTS_CONNECTION_STRING (no M2LA_ prefix).
-    otel_service_name: str = "m2la-api"
+    # Azure Monitor connection string is read from
+    # APPLICATIONINSIGHTS_CONNECTION_STRING (no M2LA_ prefix).
 
     model_config = {"env_prefix": "M2LA_"}
 

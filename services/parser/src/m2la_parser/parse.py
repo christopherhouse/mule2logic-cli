@@ -43,7 +43,7 @@ def parse(input_path: str, mode: InputMode | None = None) -> ProjectInventory:
             mode = detect_input_mode(input_path)
 
         span.set_attribute("input.mode", mode.value)
-        span.set_attribute("input.path", input_path)
+        span.set_attribute("input.filename", path.name)
 
         if mode == InputMode.SINGLE_FLOW:
             result = parse_single_flow(input_path)

@@ -216,18 +216,41 @@ class MigrationOrchestrator:
         pipeline_start = time.monotonic()
         _pipeline_active.add(1)
 
+        try:
+            return self._run_pipeline(
+                cid=cid,
+                input_path=input_path,
+                input_mode=input_mode,
+                output_directory=output_directory,
+                pipeline_start=pipeline_start,
+            )
+        finally:
+            total_ms = (time.monotonic() - pipeline_start) * 1000
+            _pipeline_active.add(-1)
+            _pipeline_duration.record(total_ms)
+
+    def _run_pipeline(
+        self,
+        *,
+        cid: str,
+        input_path: str,
+        input_mode: InputMode | None,
+        output_directory: str | None,
+        pipeline_start: float,
+    ) -> OrchestrationResult:
+        """Inner pipeline logic, always guarded by try/finally in ``run()``."""
+        from pathlib import PurePosixPath
+
         with _tracer.start_as_current_span("m2la.orchestrate") as span:
             span.set_attribute("correlation_id", cid)
-            span.set_attribute("input.path", input_path)
+            span.set_attribute("input.filename", PurePosixPath(input_path).name)
             if input_mode:
                 span.set_attribute("input.mode", input_mode.value)
 
             # Handle empty agent list early
             if not self.agents:
                 total_ms = (time.monotonic() - pipeline_start) * 1000
-                _pipeline_active.add(-1)
                 _pipeline_requests.add(1, {"status": "success"})
-                _pipeline_duration.record(total_ms)
                 return OrchestrationResult(
                     correlation_id=cid,
                     steps=[],
@@ -314,9 +337,7 @@ class MigrationOrchestrator:
             span.set_attribute("pipeline.steps", len(step_results))
             span.set_attribute("pipeline.duration_ms", total_ms)
 
-            _pipeline_active.add(-1)
             _pipeline_requests.add(1, {"status": overall_status.value})
-            _pipeline_duration.record(total_ms)
 
             return OrchestrationResult(
                 correlation_id=cid,

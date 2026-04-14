@@ -83,7 +83,7 @@ def search_logic_apps_docs(query: str) -> str:
     try:
         with _tracer.start_as_current_span("m2la.grounding.microsoft_learn") as span:
             span.set_attribute("provider", "microsoft_learn")
-            span.set_attribute("query", query)
+            span.set_attribute("query.length", len(query))
             client = _get_ms_learn_client()
             response = client.search(f"Azure Logic Apps Standard {query}")
             elapsed = (time.monotonic() - start) * 1000
@@ -114,7 +114,7 @@ def fetch_logic_apps_doc(url: str) -> str:
     try:
         with _tracer.start_as_current_span("m2la.grounding.microsoft_learn_fetch") as span:
             span.set_attribute("provider", "microsoft_learn")
-            span.set_attribute("url", url)
+            span.set_attribute("url.host", "learn.microsoft.com")
             client = _get_ms_learn_client()
             response = client.fetch_page(url)
             elapsed = (time.monotonic() - start) * 1000
@@ -149,7 +149,7 @@ def search_mulesoft_docs(query: str, library: str = "connectors") -> str:
     try:
         with _tracer.start_as_current_span("m2la.grounding.context7") as span:
             span.set_attribute("provider", "context7")
-            span.set_attribute("query", query)
+            span.set_attribute("query.length", len(query))
             span.set_attribute("library", library)
             client = _get_context7_client()
             library_id = Context7Client.MULESOFT_LIBRARIES.get(library)
