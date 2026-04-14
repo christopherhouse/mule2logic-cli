@@ -19,7 +19,7 @@ from m2la_api.config.settings import get_settings
 logger = logging.getLogger(__name__)
 
 
-@lru_cache
+@lru_cache(maxsize=1)
 def get_chat_client() -> Any:
     """Return a cached ``FoundryChatClient`` (or compatible).
 

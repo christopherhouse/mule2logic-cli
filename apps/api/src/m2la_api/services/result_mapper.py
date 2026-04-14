@@ -47,7 +47,7 @@ def _collect_reasoning(result: OrchestrationResult) -> list[Warning]:
     return warnings
 
 
-def _safe_dict(value: Any) -> dict:
+def _safe_dict(value: Any) -> dict[str, Any]:
     """Ensure *value* is a dict, returning an empty dict otherwise."""
     return value if isinstance(value, dict) else {}
 
