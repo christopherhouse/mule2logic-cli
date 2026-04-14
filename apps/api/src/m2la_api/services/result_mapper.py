@@ -224,6 +224,10 @@ def map_validate_result(
     """Map the validator-only result to a ``ValidationReport``."""
     validator_out = _safe_dict(_get_step_output(result, "ValidatorAgent") or result.final_output)
 
+    # If the validator output contains an error key or the overall status is
+    # FAILURE, treat the result as invalid rather than defaulting to valid=True.
+    has_error = "error" in validator_out or "error_message" in validator_out
+
     raw_issues = validator_out.get("issues", [])
     issues: list[ValidationIssue] = []
     if isinstance(raw_issues, list):
@@ -245,7 +249,10 @@ def map_validate_result(
                     )
                 )
 
-    is_valid = validator_out.get("valid", len(issues) == 0)
+    if has_error:
+        is_valid = False
+    else:
+        is_valid = validator_out.get("valid", len(issues) == 0)
     artifacts_validated = validator_out.get("artifacts_validated", 0)
 
     return ValidationReport(

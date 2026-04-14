@@ -137,7 +137,7 @@ print_summary() {
   echo -e "  ${ICON_LOCK}  ${BOLD}Identity${RESET}      UAMI (${UAMI_CLIENT_ID})"
   echo -e "  ${ICON_CHART}  ${BOLD}Resources${RESET}     ${CPU} vCPU / ${MEMORY}"
   echo -e "  ${ICON_CHART}  ${BOLD}Scale${RESET}         ${MIN_REPLICAS}–${MAX_REPLICAS} replicas"
-  echo -e "  ${ICON_LOCK}  ${BOLD}API Token${RESET}     ${M2LA_API_TOKEN:+configured}${M2LA_API_TOKEN:-not set}"
+  echo -e "  ${ICON_LOCK}  ${BOLD}API Token${RESET}     $( [ -n "${M2LA_API_TOKEN}" ] && echo "configured" || echo "not set" )"
   echo -e "  ${MAGENTA}${BOLD}     RG${RESET}           ${RESOURCE_GROUP}"
   echo ""
 }

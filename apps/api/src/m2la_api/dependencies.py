@@ -1,8 +1,7 @@
-"""FastAPI dependency injection for Foundry client and MigrationOrchestrator.
+"""FastAPI dependency injection for the shared Foundry chat client.
 
 The ``get_chat_client`` dependency creates a ``FoundryChatClient`` on first
-use (cached for the process lifetime).  Routes receive an orchestrator via
-``get_orchestrator`` which wraps the shared chat client.
+use (cached for the process lifetime).
 
 For tests, override ``get_chat_client`` in ``app.dependency_overrides`` to
 inject a ``MockChatClient`` instead.
@@ -15,6 +14,7 @@ from functools import lru_cache
 from typing import Any
 
 from m2la_api.config.settings import get_settings
+from m2la_api.models.errors import ApiError
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ def get_chat_client() -> Any:
     application settings.  Uses ``DefaultAzureCredential`` for UAMI-based
     authentication.
 
-    Raises :class:`RuntimeError` if the Foundry endpoint is not configured.
+    Raises :class:`ApiError` (503) if the Foundry endpoint is not configured.
     """
     settings = get_settings()
     if not settings.foundry_endpoint:
@@ -36,7 +36,11 @@ def get_chat_client() -> Any:
             "Set the environment variable to the Azure AI Foundry project endpoint."
         )
         logger.error(msg)
-        raise RuntimeError(msg)
+        raise ApiError(
+            status_code=503,
+            error_code="FOUNDRY_NOT_CONFIGURED",
+            message=msg,
+        )
 
     from agent_framework.foundry import FoundryChatClient
     from azure.identity import DefaultAzureCredential

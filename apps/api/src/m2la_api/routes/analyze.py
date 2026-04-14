@@ -19,7 +19,7 @@ from m2la_contracts import AnalyzeResponse
 
 from m2la_api.dependencies import get_chat_client
 from m2la_api.models.errors import ApiError
-from m2la_api.routes.route_utils import extract_upload, parse_telemetry, resolve_mode
+from m2la_api.routes.route_utils import check_pipeline_failure, extract_upload, parse_telemetry, resolve_mode
 from m2la_api.services.result_mapper import map_analyze_result
 from m2la_api.services.upload_handler import UploadError, cleanup_upload
 
@@ -66,6 +66,8 @@ async def analyze(
             trace_id=telemetry.trace_id,
             span_id=telemetry.span_id,
         )
+
+        check_pipeline_failure(result, "Analysis")
 
         return map_analyze_result(result, resolved_mode, telemetry)
 

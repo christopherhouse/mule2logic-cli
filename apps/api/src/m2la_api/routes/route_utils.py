@@ -2,7 +2,7 @@
 
 Consolidates common helpers used across analyze, transform, and validate
 routes: telemetry parsing, mode resolution, upload extraction, and
-upload error handling.
+pipeline failure detection.
 """
 
 from __future__ import annotations
@@ -12,8 +12,10 @@ import logging
 import uuid
 from pathlib import Path
 
+from m2la_agents.models import AgentStatus, OrchestrationResult
 from m2la_contracts import InputMode, TelemetryContext
 
+from m2la_api.models.errors import ApiError
 from m2la_api.services.upload_handler import (
     extract_project_upload,
     save_single_flow_upload,
@@ -64,3 +66,28 @@ async def extract_upload(file: object, mode: InputMode) -> Path:
     if mode == InputMode.SINGLE_FLOW:
         return await save_single_flow_upload(file)  # type: ignore[arg-type]
     return await extract_project_upload(file)  # type: ignore[arg-type]
+
+
+def check_pipeline_failure(result: OrchestrationResult, pipeline_name: str) -> None:
+    """Raise :class:`ApiError` if the pipeline overall status is FAILURE.
+
+    Args:
+        result: The orchestration result to check.
+        pipeline_name: Human-readable name of the pipeline (e.g. "Analysis").
+
+    Raises:
+        ApiError: 503 with ``PIPELINE_FAILURE`` error code.
+    """
+    if result.overall_status == AgentStatus.FAILURE:
+        detail = (
+            str(result.final_output)
+            if result.final_output
+            else f"{pipeline_name} orchestration completed with FAILURE status"
+        )
+        logger.error("%s pipeline returned failure status", pipeline_name)
+        raise ApiError(
+            status_code=503,
+            error_code="PIPELINE_FAILURE",
+            message=f"{pipeline_name} pipeline failed",
+            detail=detail,
+        )

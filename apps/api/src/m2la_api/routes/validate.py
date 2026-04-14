@@ -15,11 +15,11 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, UploadFile
 from m2la_agents import MigrationOrchestrator, ValidatorAgent
-from m2la_contracts import ValidationReport
+from m2la_contracts import InputMode, ValidationReport
 
 from m2la_api.dependencies import get_chat_client
 from m2la_api.models.errors import ApiError
-from m2la_api.routes.route_utils import parse_telemetry
+from m2la_api.routes.route_utils import check_pipeline_failure, parse_telemetry
 from m2la_api.services.result_mapper import map_validate_result
 from m2la_api.services.upload_handler import UploadError, cleanup_upload, extract_project_upload
 
@@ -55,10 +55,13 @@ async def validate(
         result = await asyncio.to_thread(
             orchestrator.run,
             str(output_path),
+            input_mode=InputMode.PROJECT,
             correlation_id=telemetry.correlation_id,
             trace_id=telemetry.trace_id,
             span_id=telemetry.span_id,
         )
+
+        check_pipeline_failure(result, "Validation")
 
         return map_validate_result(result, telemetry)
 
