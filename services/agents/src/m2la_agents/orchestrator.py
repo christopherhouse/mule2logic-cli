@@ -42,6 +42,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+_MAX_REASONING_SUMMARY_LEN = 200
+
 
 class MigrationOrchestrator:
     """Runs the full migration pipeline through a sequence of LLM-backed agents.
@@ -253,7 +255,7 @@ class MigrationOrchestrator:
                 agent_name=agent_name,
                 status=status,
                 output=output,
-                reasoning_summary=text[:200] if text else f"{agent_name} completed",
+                reasoning_summary=text[:_MAX_REASONING_SUMMARY_LEN] if text else f"{agent_name} completed",
                 error_message=error_message,
             )
             steps.append(

@@ -8,6 +8,7 @@ NOTE: This is POC auth – it will be replaced by Microsoft Entra ID.
 """
 
 import pytest
+from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
 from m2la_api.config.settings import get_settings
@@ -24,7 +25,7 @@ _PROTECTED_ENDPOINTS = [
 ]
 
 
-def _fresh_app() -> "FastAPI":  # noqa: F821
+def _fresh_app() -> FastAPI:
     """Import a **fresh** FastAPI app after env / cache changes.
 
     Because ``get_settings`` is cached with ``@lru_cache`` and the ``app``

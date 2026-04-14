@@ -44,7 +44,7 @@ var uamiName = 'id-m2la-${environmentName}'
 
 // Generate a stable, deterministic API key from resource group ID + project name + environment.
 // POC only — will be replaced with Entra authentication.
-var apiKeySeed = '${uniqueString(resourceGroup().id, 'mule2logic-api-key', environmentName)}${uniqueString(subscription().subscriptionId, 'mule2logic', environmentName)}'
+var pocApiKey = '${uniqueString(resourceGroup().id, 'mule2logic-api-key', environmentName)}${uniqueString(subscription().subscriptionId, 'mule2logic', environmentName)}'
 
 // ---------------------------------------------------------------------------
 // Module: Identity (UAMI)
@@ -159,4 +159,4 @@ output aiServicesPrincipalId string = aiFoundry.outputs.principalId
 
 // Authentication (POC)
 @description('Deterministic API key for POC authentication. Will be replaced with Entra auth.')
-output apiKey string = apiKeySeed
+output apiKey string = pocApiKey

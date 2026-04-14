@@ -55,7 +55,9 @@ class TestFoundryClientConfig:
 
     def test_endpoint_required(self) -> None:
         """Omitting endpoint should raise a ValidationError."""
-        with pytest.raises(Exception):  # noqa: B017, PT011
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
             FoundryClientConfig()
 
     def test_custom_values(self) -> None:
