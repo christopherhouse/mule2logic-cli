@@ -830,7 +830,9 @@ Requirements:
 
 ---
 
-## PR-009 — Logic Apps Standard Project Generator v1
+## PR-009 — Logic Apps Standard Project Generator v1 ✅ COMPLETE
+
+**Completed**: 2026-04-14. Implemented `m2la_transform` package at `services/transform/` with full project-mode generation (host.json, connections.json, parameters.json, .env, workflows/) and single-flow mode. 40 pytest tests pass. No deviations from spec. Follow-up: PR-010 adds full construct transformation and golden tests.
 
 ### Goal
 Generate a valid Logic Apps Standard project structure from IR for supported cases.
