@@ -1319,7 +1319,9 @@ This PR is primarily about clean interfaces and extension points.
 
 ---
 
-## PR-014 — OpenTelemetry End-to-End Instrumentation
+## PR-014 — OpenTelemetry End-to-End Instrumentation ✅ COMPLETE
+
+**Completed**: 2026-04-14. Implemented comprehensive OpenTelemetry instrumentation for both Python API backend and TypeScript CLI. Python side includes Azure Monitor distro, spans for parser/IR/transform/validate/orchestrator/grounding, 23 custom metrics, and tiktoken-based token estimation. TypeScript CLI includes Azure Monitor integration, span instrumentation for all commands (analyze, transform, validate) and API client, trace propagation headers, 6 custom metrics (commands, duration, upload_bytes, api_latency, api_calls, api_errors), and comprehensive tests. Total test count: API telemetry=4, agents token_estimator=8, CLI telemetry=9. Documentation added to README for APPLICATIONINSIGHTS_CONNECTION_STRING environment variable configuration. No deviations from spec.
 
 ### Goal
 Implement end-to-end observability across CLI, backend, and agent orchestration.

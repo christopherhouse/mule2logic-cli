@@ -6,6 +6,8 @@
 import type { AnalyzeResponse, TransformResponse, ValidationReport } from "@m2la/contracts";
 import { CliError } from "../ui/errors.js";
 import type { PackageResult } from "./project-packager.js";
+import { withSpan, getPropagationHeaders } from "../telemetry/index.js";
+import { apiLatency, apiCalls, apiErrors } from "../telemetry/metrics.js";
 
 /** API client for the migration backend. */
 export class ApiClient {
@@ -71,51 +73,82 @@ export class ApiClient {
   private async postMultipart<T>(path: string, formData: FormData): Promise<T> {
     const url = `${this.baseUrl}${path}`;
 
-    const headers: Record<string, string> = {};
-    if (this.apiToken) {
-      headers["x-api-token"] = this.apiToken;
-    }
+    return withSpan(
+      "m2la.cli.api.request",
+      async (span) => {
+        span.setAttribute("http.method", "POST");
+        span.setAttribute("http.url", url);
+        span.setAttribute("http.target", path);
 
-    let response: Response;
-    try {
-      response = await fetch(url, {
-        method: "POST",
-        headers,
-        body: formData,
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Connection failed";
-      throw new CliError(
-        "BACKEND_UNREACHABLE",
-        `Cannot connect to backend at ${this.baseUrl}: ${message}`,
-        `Ensure the backend is running at ${this.baseUrl}. You can configure the URL with --backend-url or M2LA_BACKEND_URL env var.`,
-      );
-    }
+        const headers: Record<string, string> = {};
+        if (this.apiToken) {
+          headers["x-api-token"] = this.apiToken;
+        }
 
-    if (!response.ok) {
-      if (response.status === 401) {
-        throw new CliError(
-          "UNAUTHORIZED",
-          "Backend rejected the request — invalid or missing API token.",
-          "Set the M2LA_API_TOKEN environment variable or pass --api-token <token>.",
-        );
-      }
+        // Inject trace propagation headers for distributed tracing
+        const propagationHeaders = getPropagationHeaders();
+        Object.assign(headers, propagationHeaders);
 
-      let detail = "";
-      try {
-        const errorBody = (await response.json()) as Record<string, unknown>;
-        detail = typeof errorBody.detail === "string" ? `: ${errorBody.detail}` : "";
-      } catch {
-        // ignore json parse errors on error responses
-      }
+        const startTime = Date.now();
+        let response: Response;
 
-      throw new CliError(
-        "BACKEND_ERROR",
-        `Backend returned ${response.status} ${response.statusText}${detail}`,
-        "Check backend logs for details.",
-      );
-    }
+        try {
+          apiCalls.add(1, { endpoint: path, method: "POST" });
 
-    return (await response.json()) as T;
+          response = await fetch(url, {
+            method: "POST",
+            headers,
+            body: formData,
+          });
+        } catch (error) {
+          const duration = Date.now() - startTime;
+          apiLatency.record(duration, { endpoint: path, status: "error" });
+          apiErrors.add(1, { endpoint: path, error_type: "connection_failed" });
+
+          const message = error instanceof Error ? error.message : "Connection failed";
+          throw new CliError(
+            "BACKEND_UNREACHABLE",
+            `Cannot connect to backend at ${this.baseUrl}: ${message}`,
+            `Ensure the backend is running at ${this.baseUrl}. You can configure the URL with --backend-url or M2LA_BACKEND_URL env var.`,
+          );
+        }
+
+        const duration = Date.now() - startTime;
+        apiLatency.record(duration, { endpoint: path, status: String(response.status) });
+
+        span.setAttribute("http.status_code", response.status);
+
+        if (!response.ok) {
+          apiErrors.add(1, { endpoint: path, error_type: `http_${response.status}` });
+
+          if (response.status === 401) {
+            throw new CliError(
+              "UNAUTHORIZED",
+              "Backend rejected the request — invalid or missing API token.",
+              "Set the M2LA_API_TOKEN environment variable or pass --api-token <token>.",
+            );
+          }
+
+          let detail = "";
+          try {
+            const errorBody = (await response.json()) as Record<string, unknown>;
+            detail = typeof errorBody.detail === "string" ? `: ${errorBody.detail}` : "";
+          } catch {
+            // ignore json parse errors on error responses
+          }
+
+          throw new CliError(
+            "BACKEND_ERROR",
+            `Backend returned ${response.status} ${response.statusText}${detail}`,
+            "Check backend logs for details.",
+          );
+        }
+
+        return (await response.json()) as T;
+      },
+      {
+        "api.endpoint": path,
+      },
+    );
   }
 }
