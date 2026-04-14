@@ -779,7 +779,9 @@ The IR must work for both project mode (full inventory) and single-flow mode (pa
 
 ---
 
-## PR-008 — Externalized Connector and Construct Mapping Config
+## PR-008 — Externalized Connector and Construct Mapping Config ✅ COMPLETE
+
+**Completed**: 2026-04-14. Implemented YAML config files (`connector_mappings.yaml`, `construct_mappings.yaml`, `auth_preferences.yaml`) in `packages/mapping-config/` and new `m2la-mapping-config` Python service at `services/mapping-config/`. 55 pytest tests pass (loader, resolver, ranking). Priority rules strictly enforced: built-in > managed, managed-identity > none > api-key. MVP connector set includes HTTP, scheduler, FTP/SFTP, file, JMS/VM, DB (select/insert/update/delete), object-store/blob, salesforce, email. No deviations from spec.
 
 ### Goal
 Move mapping logic into data-driven config.

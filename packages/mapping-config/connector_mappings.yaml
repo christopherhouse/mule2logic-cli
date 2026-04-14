@@ -1,0 +1,172 @@
+# Connector Mappings: MuleSoft → Azure Logic Apps Standard
+#
+# Priority rules (hard requirement — spec §6):
+#   1. Built-in Logic Apps connectors (serviceProviderConnections) — always preferred
+#   2. Identity-based authentication (managed-identity) — preferred over key/secret
+#   3. Managed/API connectors (managedApiConnections) — last resort only
+#
+# Fields:
+#   mule_namespace  : the Mule XML namespace URI
+#   mule_element    : the element local name; "*" means wildcard for any element in the namespace
+#   logic_apps.type             : "trigger" or "action"
+#   logic_apps.kind             : Logic Apps kind string (e.g. "Request", "Http", "Recurrence")
+#   logic_apps.connector_type   : "built-in" or "managed"
+#   logic_apps.auth             : "managed-identity" | "none" | "api-key"
+#   logic_apps.notes            : (optional) human-readable notes about limitations
+
+connectors:
+  # ─── HTTP ──────────────────────────────────────────────────────────────────
+  http-listener:
+    mule_namespace: "http://www.mulesoft.org/schema/mule/http"
+    mule_element: "listener"
+    logic_apps:
+      type: "trigger"
+      kind: "Request"
+      connector_type: "built-in"
+      auth: "none"
+      notes: "Maps to the built-in HTTP Request trigger; TLS/cert config must be reviewed manually"
+
+  http-request:
+    mule_namespace: "http://www.mulesoft.org/schema/mule/http"
+    mule_element: "request"
+    logic_apps:
+      type: "action"
+      kind: "Http"
+      connector_type: "built-in"
+      auth: "managed-identity"
+      notes: "Outbound HTTP; authentication scheme depends on target service"
+
+  # ─── Scheduler ─────────────────────────────────────────────────────────────
+  scheduler:
+    mule_namespace: "http://www.mulesoft.org/schema/mule/core"
+    mule_element: "scheduler"
+    logic_apps:
+      type: "trigger"
+      kind: "Recurrence"
+      connector_type: "built-in"
+      auth: "none"
+      notes: "Fixed-frequency and cron expressions are both supported via Recurrence trigger"
+
+  # ─── FTP ───────────────────────────────────────────────────────────────────
+  ftp:
+    mule_namespace: "http://www.mulesoft.org/schema/mule/ftp"
+    mule_element: "*"
+    logic_apps:
+      type: "action"
+      kind: "Sftp"
+      connector_type: "built-in"
+      auth: "managed-identity"
+      notes: "FTP mapped to SFTP built-in connector; plain-FTP (non-TLS) is not recommended — validate with target system"
+
+  # ─── SFTP ──────────────────────────────────────────────────────────────────
+  sftp:
+    mule_namespace: "http://www.mulesoft.org/schema/mule/sftp"
+    mule_element: "*"
+    logic_apps:
+      type: "action"
+      kind: "Sftp"
+      connector_type: "built-in"
+      auth: "managed-identity"
+
+  # ─── File ──────────────────────────────────────────────────────────────────
+  file:
+    mule_namespace: "http://www.mulesoft.org/schema/mule/file"
+    mule_element: "*"
+    logic_apps:
+      type: "action"
+      kind: "FileSystem"
+      connector_type: "built-in"
+      auth: "managed-identity"
+      notes: "Maps to the built-in File System connector; path conventions differ — review mount points"
+
+  # ─── JMS / ActiveMQ ────────────────────────────────────────────────────────
+  jms:
+    mule_namespace: "http://www.mulesoft.org/schema/mule/jms"
+    mule_element: "*"
+    logic_apps:
+      type: "action"
+      kind: "ServiceBus"
+      connector_type: "built-in"
+      auth: "managed-identity"
+      notes: "JMS semantics (topics/queues) map to Azure Service Bus; topic subscription model may need adjustment"
+
+  # ─── VM Connector ──────────────────────────────────────────────────────────
+  vm:
+    mule_namespace: "http://www.mulesoft.org/schema/mule/vm"
+    mule_element: "*"
+    logic_apps:
+      type: "action"
+      kind: "ServiceBus"
+      connector_type: "built-in"
+      auth: "managed-identity"
+      notes: "Mule VM (in-memory) queues mapped to Service Bus; async/transient semantics not fully preserved"
+
+  # ─── Database ──────────────────────────────────────────────────────────────
+  db-select:
+    mule_namespace: "http://www.mulesoft.org/schema/mule/db"
+    mule_element: "select"
+    logic_apps:
+      type: "action"
+      kind: "SqlServerQuery"
+      connector_type: "built-in"
+      auth: "managed-identity"
+
+  db-insert:
+    mule_namespace: "http://www.mulesoft.org/schema/mule/db"
+    mule_element: "insert"
+    logic_apps:
+      type: "action"
+      kind: "SqlServerExecuteQuery"
+      connector_type: "built-in"
+      auth: "managed-identity"
+
+  db-update:
+    mule_namespace: "http://www.mulesoft.org/schema/mule/db"
+    mule_element: "update"
+    logic_apps:
+      type: "action"
+      kind: "SqlServerExecuteQuery"
+      connector_type: "built-in"
+      auth: "managed-identity"
+
+  db-delete:
+    mule_namespace: "http://www.mulesoft.org/schema/mule/db"
+    mule_element: "delete"
+    logic_apps:
+      type: "action"
+      kind: "SqlServerExecuteQuery"
+      connector_type: "built-in"
+      auth: "managed-identity"
+
+  # ─── Object Store ──────────────────────────────────────────────────────────
+  object-store:
+    mule_namespace: "http://www.mulesoft.org/schema/mule/objectstore"
+    mule_element: "*"
+    logic_apps:
+      type: "action"
+      kind: "AzureBlob"
+      connector_type: "built-in"
+      auth: "managed-identity"
+      notes: "Mule Object Store maps to Azure Blob Storage; key/value semantics differ from blob operations"
+
+  # ─── Salesforce (managed — last resort) ────────────────────────────────────
+  salesforce:
+    mule_namespace: "http://www.mulesoft.org/schema/mule/salesforce"
+    mule_element: "*"
+    logic_apps:
+      type: "action"
+      kind: "Salesforce"
+      connector_type: "managed"
+      auth: "managed-identity"
+      notes: "Managed Salesforce connector; OAuth2 with managed-identity preferred where supported"
+
+  # ─── Email / SMTP (managed — last resort) ──────────────────────────────────
+  email-smtp:
+    mule_namespace: "http://www.mulesoft.org/schema/mule/email"
+    mule_element: "smtp-send"
+    logic_apps:
+      type: "action"
+      kind: "Office365Outlook"
+      connector_type: "managed"
+      auth: "managed-identity"
+      notes: "Managed Office 365 Outlook connector; SMTP username/password auth must be migrated to OAuth2"

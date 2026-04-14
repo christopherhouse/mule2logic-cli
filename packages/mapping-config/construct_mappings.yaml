@@ -1,0 +1,83 @@
+# Construct Mappings: MuleSoft control-flow → Azure Logic Apps Standard
+#
+# Fields:
+#   mule_element    : Mule XML element local name (may include namespace prefix, e.g. "ee:transform")
+#   logic_apps_type : Logic Apps action/trigger type string; null if no direct equivalent
+#   supported       : whether automated conversion is supported
+#   notes           : (optional) human-readable notes about limitations or conversion caveats
+
+constructs:
+  choice:
+    mule_element: "choice"
+    logic_apps_type: "If"
+    supported: true
+    notes: "Single when/otherwise maps to If; multiple when branches may be better expressed as Switch"
+
+  foreach:
+    mule_element: "foreach"
+    logic_apps_type: "Foreach"
+    supported: true
+
+  scatter-gather:
+    mule_element: "scatter-gather"
+    logic_apps_type: "Parallel"
+    supported: true
+    notes: "Parallel branches are preserved; aggregation logic must be manually reviewed"
+
+  flow-ref:
+    mule_element: "flow-ref"
+    logic_apps_type: "Scope"
+    supported: true
+    notes: "Inlined as nested scope; cross-workflow calls require HTTP or Service Bus bridging"
+
+  set-payload:
+    mule_element: "set-payload"
+    logic_apps_type: "Compose"
+    supported: true
+
+  set-variable:
+    mule_element: "set-variable"
+    logic_apps_type: "SetVariable"
+    supported: true
+
+  dataweave-transform:
+    mule_element: "ee:transform"
+    logic_apps_type: "Compose"
+    supported: true
+    notes: "Basic patterns only; complex DataWeave requires manual review and may need custom code"
+
+  error-handler:
+    mule_element: "error-handler"
+    logic_apps_type: "Scope"
+    supported: true
+    notes: "Mapped to Scope with runAfter configured to run on failure conditions"
+
+  try-scope:
+    mule_element: "try"
+    logic_apps_type: "Scope"
+    supported: true
+    notes: "Mapped to Scope with runAfter; on-error-continue/propagate semantics approximated via runAfter status filters"
+
+  logger:
+    mule_element: "logger"
+    logic_apps_type: null
+    supported: false
+    notes: "No direct equivalent; omit or convert to a Trace action / Azure Monitor Log action manually"
+
+  async-scope:
+    mule_element: "async"
+    logic_apps_type: "Scope"
+    supported: true
+    notes: "Converted to sequential Scope; async fire-and-forget semantics are not preserved — review carefully"
+
+  until-successful:
+    mule_element: "until-successful"
+    logic_apps_type: "Until"
+    supported: true
+    notes: "Retry count and delay parameters map to Until loop; max-retries and millisBetweenRetries require conversion"
+
+  parallel-foreach:
+    mule_element: "parallel-foreach"
+    logic_apps_type: "Foreach"
+    supported: true
+    notes: "Mapped to Foreach with runtimeConfiguration.concurrency.repetitions > 1 for parallel execution"
