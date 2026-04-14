@@ -21,8 +21,8 @@ export function createTransformCommand(): Command {
     .option("-o, --output <dir>", "Output directory for generated artifacts", "./output")
     .action(async (inputPath: string, options: { output: string }, cmd: Command) => {
       try {
-        const parentOpts = cmd.parent?.opts() as { backendUrl?: string } | undefined;
-        const config = getConfig({ backendUrl: parentOpts?.backendUrl });
+        const parentOpts = cmd.parent?.opts() as { backendUrl?: string; apiToken?: string } | undefined;
+        const config = getConfig({ backendUrl: parentOpts?.backendUrl, apiToken: parentOpts?.apiToken });
 
         // Detect input mode
         const mode = await detectInputMode(inputPath);
@@ -39,7 +39,7 @@ export function createTransformCommand(): Command {
         const spinner = createSpinner("Transforming...");
         spinner.start();
 
-        const client = new ApiClient(config.backendUrl);
+        const client = new ApiClient(config.backendUrl, config.apiToken);
         const request: TransformRequest = {
           input_path: inputPath,
           mode,

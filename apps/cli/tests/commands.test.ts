@@ -37,7 +37,11 @@ describe("CLI commands", () => {
 
   it("program should include all commands and --backend-url option", () => {
     const program = new Command();
-    program.name("mule2logic").version("0.1.0").option("--backend-url <url>", "Backend API URL");
+    program
+      .name("mule2logic")
+      .version("0.1.0")
+      .option("--backend-url <url>", "Backend API URL")
+      .option("--api-token <token>", "API token for backend authentication");
 
     program.addCommand(createAnalyzeCommand());
     program.addCommand(createTransformCommand());
@@ -50,5 +54,8 @@ describe("CLI commands", () => {
 
     const backendOpt = program.options.find((o) => o.long === "--backend-url");
     expect(backendOpt).toBeDefined();
+
+    const apiTokenOpt = program.options.find((o) => o.long === "--api-token");
+    expect(apiTokenOpt).toBeDefined();
   });
 });

@@ -19,8 +19,8 @@ export function createAnalyzeCommand(): Command {
     .argument("<inputPath>", "Path to MuleSoft project directory or single flow XML file")
     .action(async (inputPath: string, _options: unknown, cmd: Command) => {
       try {
-        const parentOpts = cmd.parent?.opts() as { backendUrl?: string } | undefined;
-        const config = getConfig({ backendUrl: parentOpts?.backendUrl });
+        const parentOpts = cmd.parent?.opts() as { backendUrl?: string; apiToken?: string } | undefined;
+        const config = getConfig({ backendUrl: parentOpts?.backendUrl, apiToken: parentOpts?.apiToken });
 
         // Detect input mode
         const mode = await detectInputMode(inputPath);
@@ -37,7 +37,7 @@ export function createAnalyzeCommand(): Command {
         const spinner = createSpinner("Analyzing...");
         spinner.start();
 
-        const client = new ApiClient(config.backendUrl);
+        const client = new ApiClient(config.backendUrl, config.apiToken);
         const request: AnalyzeRequest = {
           input_path: inputPath,
           mode,

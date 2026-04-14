@@ -18,8 +18,8 @@ export function createValidateCommand(): Command {
     .argument("<outputPath>", "Path to the generated Logic Apps output directory")
     .action(async (outputPath: string, _options: unknown, cmd: Command) => {
       try {
-        const parentOpts = cmd.parent?.opts() as { backendUrl?: string } | undefined;
-        const config = getConfig({ backendUrl: parentOpts?.backendUrl });
+        const parentOpts = cmd.parent?.opts() as { backendUrl?: string; apiToken?: string } | undefined;
+        const config = getConfig({ backendUrl: parentOpts?.backendUrl, apiToken: parentOpts?.apiToken });
 
         // Verify output path exists
         const resolvedPath = resolve(outputPath);
@@ -37,7 +37,7 @@ export function createValidateCommand(): Command {
         const spinner = createSpinner("Validating...");
         spinner.start();
 
-        const client = new ApiClient(config.backendUrl);
+        const client = new ApiClient(config.backendUrl, config.apiToken);
         const result = await client.validate(resolvedPath);
 
         if (result.valid) {

@@ -41,4 +41,22 @@ describe("getConfig", () => {
     const config = getConfig();
     expect(config.verbose).toBe(true);
   });
+
+  it("should return undefined apiToken when no env var or override", () => {
+    delete process.env.M2LA_API_TOKEN;
+    const config = getConfig();
+    expect(config.apiToken).toBeUndefined();
+  });
+
+  it("should use M2LA_API_TOKEN env var", () => {
+    process.env.M2LA_API_TOKEN = "test-token-123";
+    const config = getConfig();
+    expect(config.apiToken).toBe("test-token-123");
+  });
+
+  it("should prefer apiToken override over env var", () => {
+    process.env.M2LA_API_TOKEN = "env-token";
+    const config = getConfig({ apiToken: "override-token" });
+    expect(config.apiToken).toBe("override-token");
+  });
 });

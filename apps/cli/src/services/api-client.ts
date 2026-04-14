@@ -14,10 +14,12 @@ import { CliError } from "../ui/errors.js";
 /** API client for the migration backend. */
 export class ApiClient {
   private readonly baseUrl: string;
+  private readonly apiToken?: string;
 
-  constructor(backendUrl: string) {
+  constructor(backendUrl: string, apiToken?: string) {
     // Ensure no trailing slash
     this.baseUrl = backendUrl.replace(/\/+$/, "");
+    this.apiToken = apiToken;
   }
 
   /**
@@ -38,7 +40,7 @@ export class ApiClient {
    * Send a validate request to the backend.
    */
   async validate(outputPath: string): Promise<ValidationReport> {
-    return this.post<ValidationReport>("/validate", { output_path: outputPath });
+    return this.post<ValidationReport>("/validate", { output_directory: outputPath });
   }
 
   /**
@@ -47,11 +49,18 @@ export class ApiClient {
   private async post<T>(path: string, body: unknown): Promise<T> {
     const url = `${this.baseUrl}${path}`;
 
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (this.apiToken) {
+      headers["x-api-token"] = this.apiToken;
+    }
+
     let response: Response;
     try {
       response = await fetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify(body),
       });
     } catch (error) {
@@ -64,6 +73,14 @@ export class ApiClient {
     }
 
     if (!response.ok) {
+      if (response.status === 401) {
+        throw new CliError(
+          "UNAUTHORIZED",
+          "Backend rejected the request — invalid or missing API token.",
+          "Set the M2LA_API_TOKEN environment variable or pass --api-token <token>.",
+        );
+      }
+
       let detail = "";
       try {
         const errorBody = (await response.json()) as Record<string, unknown>;
