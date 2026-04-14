@@ -226,6 +226,41 @@ class TestBuildMafAgent:
         tool_names = [t.__name__ for t in tools]
         assert "suggest_repairs" in tool_names
 
+    # -- Grounding tools wired into agents ---------------------------------
+
+    def test_planner_tools_include_grounding(self) -> None:
+        """PlannerAgent should have grounding tools from Microsoft Learn and Context7."""
+        agent = PlannerAgent()
+        tools = agent._get_tools()  # noqa: SLF001
+        tool_names = [t.__name__ for t in tools]
+        assert "search_logic_apps_docs" in tool_names
+        assert "search_mulesoft_docs" in tool_names
+
+    def test_transformer_tools_include_grounding(self) -> None:
+        """TransformerAgent should have grounding tools including page fetch."""
+        agent = TransformerAgent()
+        tools = agent._get_tools()  # noqa: SLF001
+        tool_names = [t.__name__ for t in tools]
+        assert "search_logic_apps_docs" in tool_names
+        assert "fetch_logic_apps_doc" in tool_names
+        assert "search_mulesoft_docs" in tool_names
+
+    def test_repair_tools_include_grounding(self) -> None:
+        """RepairAdvisorAgent should have grounding tools."""
+        agent = RepairAdvisorAgent()
+        tools = agent._get_tools()  # noqa: SLF001
+        tool_names = [t.__name__ for t in tools]
+        assert "search_logic_apps_docs" in tool_names
+        assert "search_mulesoft_docs" in tool_names
+
+    def test_analyzer_tools_no_grounding(self) -> None:
+        """AnalyzerAgent should NOT have grounding tools (analysis is deterministic)."""
+        agent = AnalyzerAgent()
+        tools = agent._get_tools()  # noqa: SLF001
+        tool_names = [t.__name__ for t in tools]
+        assert "search_logic_apps_docs" not in tool_names
+        assert "search_mulesoft_docs" not in tool_names
+
 
 # ---------------------------------------------------------------------------
 # Orchestrator client requirement

@@ -102,10 +102,17 @@ class PlannerAgent(BaseAgent):
         )
 
     def _get_tools(self) -> Sequence[Callable[..., Any]]:
-        """Return the ``create_migration_plan`` function as a tool."""
-        from m2la_agents.function_tools import create_migration_plan
+        """Return planning and grounding tool functions.
 
-        return [create_migration_plan]
+        The planner has access to:
+        - ``create_migration_plan`` — deterministic mapping evaluation
+        - ``search_logic_apps_docs`` — Microsoft Learn grounding
+        - ``search_mulesoft_docs`` — Context7 MuleSoft grounding
+        """
+        from m2la_agents.function_tools import create_migration_plan
+        from m2la_agents.grounding.tool_functions import search_logic_apps_docs, search_mulesoft_docs
+
+        return [create_migration_plan, search_logic_apps_docs, search_mulesoft_docs]
 
     def execute(self, context: AgentContext) -> AgentResult:
         """Produce a migration plan from the analysis results.

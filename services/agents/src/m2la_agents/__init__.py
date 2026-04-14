@@ -20,6 +20,18 @@ from m2la_agents.function_tools import (
     transform_to_logic_apps,
     validate_output_artifacts,
 )
+from m2la_agents.grounding import (
+    Context7Client,
+    GroundingConnectionError,
+    GroundingError,
+    GroundingResponse,
+    GroundingResult,
+    GroundingTimeoutError,
+    MicrosoftLearnClient,
+    fetch_logic_apps_doc,
+    search_logic_apps_docs,
+    search_mulesoft_docs,
+)
 from m2la_agents.models import AgentContext, AgentResult, AgentStatus, MigrationPlan, OrchestrationResult, StepResult
 from m2la_agents.orchestrator import MigrationOrchestrator
 from m2la_agents.planner import PlannerAgent
@@ -63,6 +75,19 @@ __all__ = [
     "transform_to_logic_apps",
     "validate_output_artifacts",
     "suggest_repairs",
+    # Grounding — clients
+    "MicrosoftLearnClient",
+    "Context7Client",
+    # Grounding — models / errors
+    "GroundingResponse",
+    "GroundingResult",
+    "GroundingError",
+    "GroundingTimeoutError",
+    "GroundingConnectionError",
+    # Grounding — tool functions
+    "search_logic_apps_docs",
+    "fetch_logic_apps_doc",
+    "search_mulesoft_docs",
     # Prompts
     "analyzer_prompt",
     "orchestrator_prompt",
