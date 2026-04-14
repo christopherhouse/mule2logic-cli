@@ -17,18 +17,9 @@ with reasoning summaries.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from enum import StrEnum
 from typing import Any
 
 from m2la_agents.models import AgentContext, AgentResult
-
-
-class AgentStatus(StrEnum):
-    """Outcome status of an agent execution."""
-
-    SUCCESS = "success"
-    FAILURE = "failure"
-    PARTIAL = "partial"
 
 
 class BaseAgent(ABC):

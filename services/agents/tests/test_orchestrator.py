@@ -8,8 +8,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from m2la_agents.base import AgentStatus, BaseAgent
-from m2la_agents.models import AgentContext, AgentResult
+from m2la_agents.base import BaseAgent
+from m2la_agents.models import AgentContext, AgentResult, AgentStatus
 from m2la_agents.orchestrator import MigrationOrchestrator
 
 # ---------------------------------------------------------------------------

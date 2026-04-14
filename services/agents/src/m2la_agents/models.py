@@ -20,11 +20,7 @@ from pydantic import BaseModel, Field
 
 
 class AgentStatus(StrEnum):
-    """Outcome status of an agent execution.
-
-    Duplicated from :mod:`m2la_agents.base` for import convenience
-    when models are used independently of the base class.
-    """
+    """Outcome status of an agent execution."""
 
     SUCCESS = "success"
     FAILURE = "failure"

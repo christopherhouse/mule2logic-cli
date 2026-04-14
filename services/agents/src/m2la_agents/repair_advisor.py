@@ -16,8 +16,8 @@ from m2la_contracts.enums import GapCategory, Severity
 from m2la_contracts.validate import ValidationIssue, ValidationReport
 from pydantic import BaseModel, Field
 
-from m2la_agents.base import AgentStatus, BaseAgent
-from m2la_agents.models import AgentContext, AgentResult
+from m2la_agents.base import BaseAgent
+from m2la_agents.models import AgentContext, AgentResult, AgentStatus
 
 
 class RepairSuggestion(BaseModel):
@@ -138,10 +138,7 @@ class RepairAdvisorAgent(BaseAgent):
                 status = AgentStatus.SUCCESS
             else:
                 auto_count = sum(1 for s in suggestions if s.auto_fixable)
-                summary = (
-                    f"Produced {len(suggestions)} repair suggestion(s) "
-                    f"({auto_count} auto-fixable)"
-                )
+                summary = f"Produced {len(suggestions)} repair suggestion(s) ({auto_count} auto-fixable)"
                 status = AgentStatus.SUCCESS
 
             elapsed_ms = (time.monotonic() - start) * 1000

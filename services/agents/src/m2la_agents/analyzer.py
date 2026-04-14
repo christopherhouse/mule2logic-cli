@@ -34,8 +34,8 @@ from m2la_parser.models import ProjectInventory
 from m2la_parser.parse import parse
 from m2la_validate.engine import validate_mule_input
 
-from m2la_agents.base import AgentStatus, BaseAgent
-from m2la_agents.models import AgentContext, AgentResult
+from m2la_agents.base import BaseAgent
+from m2la_agents.models import AgentContext, AgentResult, AgentStatus
 
 
 def _inventory_to_ir(inventory: ProjectInventory, input_path: str) -> MuleIR:
@@ -68,9 +68,7 @@ def _inventory_to_ir(inventory: ProjectInventory, input_path: str) -> MuleIR:
         for proc in mule_flow.processors:
             if proc.element_type == "logger":
                 msg = proc.attributes.get("message", "")
-                steps.append(
-                    make_logger(message=msg, source_location=make_source_location(file=mule_flow.source_file))
-                )
+                steps.append(make_logger(message=msg, source_location=make_source_location(file=mule_flow.source_file)))
             else:
                 steps.append(
                     make_processor(

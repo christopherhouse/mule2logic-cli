@@ -5,8 +5,7 @@ from __future__ import annotations
 from typing import Any
 from unittest.mock import patch
 
-from m2la_agents.base import AgentStatus
-from m2la_agents.models import MigrationPlan
+from m2la_agents.models import AgentStatus, MigrationPlan
 from m2la_agents.planner import PlannerAgent
 
 

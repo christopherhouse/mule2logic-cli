@@ -17,8 +17,8 @@ from m2la_contracts.enums import InputMode
 from m2la_contracts.validate import ValidationReport
 from m2la_validate.engine import validate_output
 
-from m2la_agents.base import AgentStatus, BaseAgent
-from m2la_agents.models import AgentContext, AgentResult
+from m2la_agents.base import BaseAgent
+from m2la_agents.models import AgentContext, AgentResult, AgentStatus
 
 
 class ValidatorAgent(BaseAgent):

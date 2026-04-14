@@ -9,7 +9,7 @@ import pytest
 from m2la_contracts.enums import GapCategory, Severity, ValidationCategory
 from m2la_contracts.validate import ValidationIssue, ValidationReport
 
-from m2la_agents.base import AgentStatus
+from m2la_agents.models import AgentStatus
 from m2la_agents.repair_advisor import RepairAdvisorAgent, RepairSuggestion
 
 

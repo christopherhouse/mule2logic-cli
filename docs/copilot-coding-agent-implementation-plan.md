@@ -1020,7 +1020,11 @@ Add tests for both passing and failing cases in both project mode and single-flo
 
 ---
 
-## PR-012 — Microsoft Agent Framework Orchestration
+## PR-012 — Microsoft Agent Framework Orchestration ✅ COMPLETE
+
+**Completed: 2026-04-14**
+
+Delivered all five specialized agents (AnalyzerAgent, PlannerAgent, TransformerAgent, ValidatorAgent, RepairAdvisorAgent) plus MigrationOrchestrator in `services/agents/`. All agents are thin deterministic wrappers around existing services — no LLM calls. 75 tests passing (unit + integration with real sample fixtures). Design is extensible for future MCP/LLM integrations via `tools` list on BaseAgent. README documents architecture, data flow, deterministic vs orchestration boundary, and extension points.
 
 ### Goal
 Wrap deterministic services in agentic orchestration.

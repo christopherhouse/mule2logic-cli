@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 from m2la_contracts.enums import InputMode
 
-from m2la_agents.base import AgentStatus
+from m2la_agents.models import AgentStatus
 from m2la_agents.transformer import TransformerAgent
 
 

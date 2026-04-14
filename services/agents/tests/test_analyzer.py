@@ -8,8 +8,7 @@ from typing import Any
 from m2la_contracts.enums import InputMode
 
 from m2la_agents.analyzer import AnalyzerAgent
-from m2la_agents.base import AgentStatus
-from m2la_agents.models import AgentContext
+from m2la_agents.models import AgentContext, AgentStatus
 
 
 class TestAnalyzerAgentHappyPath:

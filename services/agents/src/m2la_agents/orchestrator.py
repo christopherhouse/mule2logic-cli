@@ -25,8 +25,8 @@ from datetime import UTC, datetime
 from m2la_contracts.enums import InputMode
 
 from m2la_agents.analyzer import AnalyzerAgent
-from m2la_agents.base import AgentStatus, BaseAgent
-from m2la_agents.models import AgentContext, AgentResult, OrchestrationResult, StepResult
+from m2la_agents.base import BaseAgent
+from m2la_agents.models import AgentContext, AgentResult, AgentStatus, OrchestrationResult, StepResult
 from m2la_agents.planner import PlannerAgent
 from m2la_agents.repair_advisor import RepairAdvisorAgent
 from m2la_agents.transformer import TransformerAgent

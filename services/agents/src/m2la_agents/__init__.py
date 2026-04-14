@@ -11,8 +11,8 @@ to each agent's ``tools`` list.
 """
 
 from m2la_agents.analyzer import AnalyzerAgent
-from m2la_agents.base import AgentStatus, BaseAgent
-from m2la_agents.models import AgentContext, AgentResult, MigrationPlan, OrchestrationResult, StepResult
+from m2la_agents.base import BaseAgent
+from m2la_agents.models import AgentContext, AgentResult, AgentStatus, MigrationPlan, OrchestrationResult, StepResult
 from m2la_agents.orchestrator import MigrationOrchestrator
 from m2la_agents.planner import PlannerAgent
 from m2la_agents.repair_advisor import RepairAdvisorAgent, RepairSuggestion

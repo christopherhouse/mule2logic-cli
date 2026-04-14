@@ -27,8 +27,8 @@ from m2la_ir.models import (
 from m2la_mapping_config.loader import load_all
 from m2la_mapping_config.resolver import MappingResolver
 
-from m2la_agents.base import AgentStatus, BaseAgent
-from m2la_agents.models import AgentContext, AgentResult, MappingDecision, MigrationPlan
+from m2la_agents.base import BaseAgent
+from m2la_agents.models import AgentContext, AgentResult, AgentStatus, MappingDecision, MigrationPlan
 
 
 def _collect_constructs(flows: list[Flow]) -> list[str]:

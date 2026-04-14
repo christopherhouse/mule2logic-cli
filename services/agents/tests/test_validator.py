@@ -9,7 +9,7 @@ from unittest.mock import patch
 from m2la_contracts.enums import InputMode
 from m2la_contracts.validate import ValidationReport
 
-from m2la_agents.base import AgentStatus
+from m2la_agents.models import AgentStatus
 from m2la_agents.validator import ValidatorAgent
 
 

@@ -21,8 +21,8 @@ from m2la_transform.generator import generate_project
 from m2la_transform.single_flow import generate_single_flow_workflow
 from m2la_validate.engine import validate_ir
 
-from m2la_agents.base import AgentStatus, BaseAgent
-from m2la_agents.models import AgentContext, AgentResult
+from m2la_agents.base import BaseAgent
+from m2la_agents.models import AgentContext, AgentResult, AgentStatus
 
 
 class TransformerAgent(BaseAgent):
