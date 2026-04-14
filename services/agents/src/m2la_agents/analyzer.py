@@ -17,6 +17,7 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
+from azure.ai.agents.models import FunctionTool
 from m2la_contracts.enums import InputMode
 from m2la_contracts.helpers import detect_input_mode
 from m2la_ir.builders import (
@@ -145,7 +146,22 @@ class AnalyzerAgent(BaseAgent):
     """
 
     def __init__(self) -> None:
-        super().__init__(name="AnalyzerAgent")
+        super().__init__(
+            name="AnalyzerAgent",
+            instructions=(
+                "You are an analysis agent for MuleSoft to Logic Apps migration. "
+                "Use the analyze_mule_input tool to parse and analyze the input "
+                "MuleSoft project or flow XML.  Report the number of flows, "
+                "sub-flows, constructs, and any warnings found."
+            ),
+        )
+
+    def _register_tools(self) -> None:
+        """Register the ``analyze_mule_input`` function tool."""
+        from m2la_agents.function_tools import analyze_mule_input
+
+        functions = FunctionTool({analyze_mule_input})
+        self.toolset.add(functions)
 
     def execute(self, context: AgentContext) -> AgentResult:
         """Parse, build IR, and validate the MuleSoft input.

@@ -15,6 +15,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from azure.ai.agents.models import FunctionTool
 from m2la_contracts.enums import InputMode
 from m2la_ir.models import MuleIR
 from m2la_transform.generator import generate_project
@@ -40,7 +41,21 @@ class TransformerAgent(BaseAgent):
     """
 
     def __init__(self) -> None:
-        super().__init__(name="TransformerAgent")
+        super().__init__(
+            name="TransformerAgent",
+            instructions=(
+                "You are a transformation agent for MuleSoft to Logic Apps migration. "
+                "Use the transform_to_logic_apps tool to convert intermediate "
+                "representation into Logic Apps Standard artifacts."
+            ),
+        )
+
+    def _register_tools(self) -> None:
+        """Register the ``transform_to_logic_apps`` function tool."""
+        from m2la_agents.function_tools import transform_to_logic_apps
+
+        functions = FunctionTool({transform_to_logic_apps})
+        self.toolset.add(functions)
 
     def execute(self, context: AgentContext) -> AgentResult:
         """Validate the IR and generate Logic Apps artifacts.

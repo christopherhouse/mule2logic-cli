@@ -1,54 +1,112 @@
-"""Base agent protocol and shared enumerations.
+"""Base agent protocol using the Azure AI Agents SDK.
 
-All agents extend :class:`BaseAgent` and implement the
-:meth:`~BaseAgent.execute` method. The base class provides:
+Each agent wraps an SDK ``Agent`` object created via
+``AgentsClient.create_agent()``.  When running in **offline mode**
+(no ``AgentsClient``), agents execute deterministic logic directly
+without LLM involvement.
 
-* A common ``name`` and ``tools`` interface.
-* A standardised ``execute(context) → AgentResult`` contract.
-* A clear separation between **deterministic service logic**
-  (which lives in ``m2la_parser``, ``m2la_ir``, ``m2la_transform``, etc.)
-  and **orchestration logic** (which lives here).
+All agents extend :class:`BaseAgent` and implement:
 
-Agents are thin — they call deterministic services, measure timing,
-and produce structured :class:`~m2la_agents.models.AgentResult` objects
-with reasoning summaries.
+* :meth:`_register_tools` — register deterministic service functions
+  as :class:`~azure.ai.agents.models.FunctionTool` callables.
+* :meth:`execute` — the offline / deterministic execution path.
+
+The base class provides SDK lifecycle helpers
+(:meth:`create_on_service`, :meth:`cleanup`) and a standardised
+``execute(context) → AgentResult`` contract.
 """
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import TYPE_CHECKING
+
+from azure.ai.agents.models import ToolSet
 
 from m2la_agents.models import AgentContext, AgentResult
 
+if TYPE_CHECKING:
+    from azure.ai.agents import AgentsClient
+
 
 class BaseAgent(ABC):
-    """Abstract base class for all migration agents.
+    """Abstract base class for migration agents using Azure AI Agents SDK.
 
-    Subclasses must implement :meth:`execute`, which receives an
-    :class:`AgentContext` and returns an :class:`AgentResult`.
+    Each agent registers deterministic service functions as
+    :class:`~azure.ai.agents.models.FunctionTool` callables via the SDK.
+    When an ``AgentsClient`` is provided, agents are created on the Azure
+    AI Agent Service and runs use LLM-backed reasoning.  When no client
+    is provided (**offline mode**), agents execute their deterministic
+    logic directly.
 
     Attributes:
         name: Human-readable agent name (e.g. ``"AnalyzerAgent"``).
-        tools: Placeholder list for future MCP tool definitions.
-            Currently empty for all agents; the design allows
-            future LLM-backed tool integrations without changing
-            the protocol.
+        instructions: Agent instructions for the LLM (when using SDK).
+        toolset: SDK ``ToolSet`` with registered ``FunctionTool`` callables.
+        sdk_agent_id: ID of the agent created on the service
+            (``None`` in offline mode).
     """
 
     name: str
-    tools: list[Any]
+    instructions: str
+    toolset: ToolSet
+    sdk_agent_id: str | None
 
-    def __init__(self, *, name: str, tools: list[Any] | None = None) -> None:
+    def __init__(self, *, name: str, instructions: str = "") -> None:
         self.name = name
-        self.tools = tools or []
+        self.instructions = instructions
+        self.toolset = ToolSet()
+        self.sdk_agent_id = None
+        self._register_tools()
+
+    # ------------------------------------------------------------------
+    # Tool registration (subclass hook)
+    # ------------------------------------------------------------------
+
+    @abstractmethod
+    def _register_tools(self) -> None:
+        """Register deterministic service functions as ``FunctionTool`` in *self.toolset*."""
+        ...
+
+    # ------------------------------------------------------------------
+    # SDK lifecycle
+    # ------------------------------------------------------------------
+
+    def create_on_service(self, client: AgentsClient, model: str) -> str:
+        """Create this agent on the Azure AI Agent Service.
+
+        Args:
+            client: An authenticated ``AgentsClient``.
+            model: The model deployment name (e.g. ``"gpt-4o"``).
+
+        Returns:
+            The agent ID assigned by the service.
+        """
+        sdk_agent = client.create_agent(
+            model=model,
+            name=self.name,
+            instructions=self.instructions,
+            toolset=self.toolset,
+        )
+        self.sdk_agent_id = sdk_agent.id
+        return sdk_agent.id
+
+    def cleanup(self, client: AgentsClient) -> None:
+        """Delete this agent from the service."""
+        if self.sdk_agent_id:
+            client.delete_agent(self.sdk_agent_id)
+            self.sdk_agent_id = None
+
+    # ------------------------------------------------------------------
+    # Execution (offline / deterministic path)
+    # ------------------------------------------------------------------
 
     @abstractmethod
     def execute(self, context: AgentContext) -> AgentResult:
-        """Run the agent's orchestration logic.
+        """Run the agent's orchestration logic (offline/deterministic mode).
 
-        This is the single entry point for every agent. Implementations
-        should:
+        This is the single entry point for every agent when running
+        **without** the Azure AI Agent Service.  Implementations should:
 
         1. Extract required inputs from *context*.
         2. Call one or more deterministic services.
@@ -65,4 +123,5 @@ class BaseAgent(ABC):
         ...
 
     def __repr__(self) -> str:
-        return f"{type(self).__name__}(name={self.name!r}, tools={len(self.tools)})"
+        mode = "online" if self.sdk_agent_id else "offline"
+        return f"{type(self).__name__}(name={self.name!r}, mode={mode})"

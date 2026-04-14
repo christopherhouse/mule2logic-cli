@@ -13,6 +13,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from azure.ai.agents.models import FunctionTool
 from m2la_contracts.enums import InputMode
 from m2la_contracts.validate import ValidationReport
 from m2la_validate.engine import validate_output
@@ -33,7 +34,21 @@ class ValidatorAgent(BaseAgent):
     """
 
     def __init__(self) -> None:
-        super().__init__(name="ValidatorAgent")
+        super().__init__(
+            name="ValidatorAgent",
+            instructions=(
+                "You are a validation agent for MuleSoft to Logic Apps migration. "
+                "Use the validate_output_artifacts tool to check generated Logic Apps "
+                "artifacts for correctness and completeness."
+            ),
+        )
+
+    def _register_tools(self) -> None:
+        """Register the ``validate_output_artifacts`` function tool."""
+        from m2la_agents.function_tools import validate_output_artifacts
+
+        functions = FunctionTool({validate_output_artifacts})
+        self.toolset.add(functions)
 
     def execute(self, context: AgentContext) -> AgentResult:
         """Validate the generated Logic Apps artifacts.

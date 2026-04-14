@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import time
 
+from azure.ai.agents.models import FunctionTool
 from m2la_ir.models import (
     ConnectorOperation,
     Flow,
@@ -82,7 +83,22 @@ class PlannerAgent(BaseAgent):
     """
 
     def __init__(self) -> None:
-        super().__init__(name="PlannerAgent")
+        super().__init__(
+            name="PlannerAgent",
+            instructions=(
+                "You are a planning agent for MuleSoft to Logic Apps migration. "
+                "Use the create_migration_plan tool to evaluate mapping availability "
+                "and produce a migration plan that describes which constructs are "
+                "supported, unsupported, or partially supported."
+            ),
+        )
+
+    def _register_tools(self) -> None:
+        """Register the ``create_migration_plan`` function tool."""
+        from m2la_agents.function_tools import create_migration_plan
+
+        functions = FunctionTool({create_migration_plan})
+        self.toolset.add(functions)
 
     def execute(self, context: AgentContext) -> AgentResult:
         """Produce a migration plan from the analysis results.

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import time
 
+from azure.ai.agents.models import FunctionTool
 from m2la_contracts.enums import GapCategory, Severity
 from m2la_contracts.validate import ValidationIssue, ValidationReport
 from pydantic import BaseModel, Field
@@ -86,7 +87,21 @@ class RepairAdvisorAgent(BaseAgent):
     """
 
     def __init__(self) -> None:
-        super().__init__(name="RepairAdvisorAgent")
+        super().__init__(
+            name="RepairAdvisorAgent",
+            instructions=(
+                "You are a repair advisor agent for MuleSoft to Logic Apps migration. "
+                "Use the suggest_repairs tool to analyse validation issues and migration "
+                "gaps and produce actionable repair suggestions."
+            ),
+        )
+
+    def _register_tools(self) -> None:
+        """Register the ``suggest_repairs`` function tool."""
+        from m2la_agents.function_tools import suggest_repairs
+
+        functions = FunctionTool({suggest_repairs})
+        self.toolset.add(functions)
 
     def execute(self, context: AgentContext) -> AgentResult:
         """Analyze issues and produce repair suggestions.
