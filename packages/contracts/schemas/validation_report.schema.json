@@ -51,11 +51,22 @@
       "title": "TelemetryContext",
       "type": "object"
     },
+    "ValidationCategory": {
+      "description": "Categories for validation checks.",
+      "enum": [
+        "mule_input",
+        "ir_integrity",
+        "output_integrity",
+        "connector_preference"
+      ],
+      "title": "ValidationCategory",
+      "type": "string"
+    },
     "ValidationIssue": {
       "description": "A single validation issue found in the generated artifacts.",
       "properties": {
         "rule_id": {
-          "description": "Machine-readable rule identifier (e.g., 'SCHEMA_001')",
+          "description": "Machine-readable rule identifier (e.g., 'MULE_001')",
           "title": "Rule Id",
           "type": "string"
         },
@@ -67,6 +78,10 @@
         "severity": {
           "$ref": "#/$defs/Severity",
           "description": "Issue severity"
+        },
+        "category": {
+          "$ref": "#/$defs/ValidationCategory",
+          "description": "Classification of the validation check"
         },
         "artifact_path": {
           "anyOf": [
@@ -93,12 +108,26 @@
           "default": null,
           "description": "Location within the artifact (e.g., line number or JSON path)",
           "title": "Location"
+        },
+        "remediation_hint": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Actionable suggestion for resolving the issue",
+          "title": "Remediation Hint"
         }
       },
       "required": [
         "rule_id",
         "message",
-        "severity"
+        "severity",
+        "category"
       ],
       "title": "ValidationIssue",
       "type": "object"
@@ -127,13 +156,20 @@
       "type": "integer"
     },
     "telemetry": {
-      "$ref": "#/$defs/TelemetryContext",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/TelemetryContext"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
       "description": "Telemetry context for trace correlation"
     }
   },
   "required": [
-    "valid",
-    "telemetry"
+    "valid"
   ],
   "title": "ValidationReport",
   "type": "object"
