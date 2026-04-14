@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     port: int = 8000
     log_level: str = "info"
     debug: bool = False
+    # POC API key auth – will be replaced by Entra ID authentication.
+    api_key: str = ""
 
     model_config = {"env_prefix": "M2LA_"}
 

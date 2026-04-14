@@ -15,6 +15,7 @@ class TestSettings:
         assert settings.port == 8000
         assert settings.log_level == "info"
         assert settings.debug is False
+        assert settings.api_key == ""
 
     def test_env_override(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Environment variables should override defaults."""
@@ -22,11 +23,13 @@ class TestSettings:
         monkeypatch.setenv("M2LA_PORT", "9000")
         monkeypatch.setenv("M2LA_LOG_LEVEL", "debug")
         monkeypatch.setenv("M2LA_DEBUG", "true")
+        monkeypatch.setenv("M2LA_API_KEY", "test-secret-key")
         settings = Settings()
         assert settings.host == "0.0.0.0"
         assert settings.port == 9000
         assert settings.log_level == "debug"
         assert settings.debug is True
+        assert settings.api_key == "test-secret-key"
 
     def test_partial_override(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Only overridden env vars should change; others keep defaults."""
