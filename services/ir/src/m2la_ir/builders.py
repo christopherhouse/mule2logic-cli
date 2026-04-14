@@ -10,6 +10,7 @@ from typing import Any
 
 from m2la_contracts.common import Warning
 from m2la_contracts.enums import InputMode
+from opentelemetry import trace
 
 from m2la_ir.enums import (
     ConnectorType,
@@ -39,6 +40,8 @@ from m2la_ir.models import (
     VariableOperation,
 )
 
+_tracer = trace.get_tracer("m2la.ir")
+
 
 def build_project_ir(
     *,
@@ -66,21 +69,25 @@ def build_project_ir(
     Returns:
         A fully constructed MuleIR for project mode.
     """
-    return MuleIR(
-        ir_metadata=IRMetadata(
-            source_mode=InputMode.PROJECT,
-            source_path=source_path,
-        ),
-        project_metadata=ProjectMetadata(
-            name=project_name,
-            group_id=group_id,
-            artifact_id=artifact_id,
-            version=version,
-            description=description,
-        ),
-        flows=flows or [],
-        warnings=warnings or [],
-    )
+    with _tracer.start_as_current_span("m2la.ir.build_project") as span:
+        resolved_flows = flows or []
+        span.set_attribute("ir.flows_count", len(resolved_flows))
+        span.set_attribute("ir.steps_count", sum(len(f.steps) for f in resolved_flows))
+        return MuleIR(
+            ir_metadata=IRMetadata(
+                source_mode=InputMode.PROJECT,
+                source_path=source_path,
+            ),
+            project_metadata=ProjectMetadata(
+                name=project_name,
+                group_id=group_id,
+                artifact_id=artifact_id,
+                version=version,
+                description=description,
+            ),
+            flows=resolved_flows,
+            warnings=warnings or [],
+        )
 
 
 def build_single_flow_ir(
@@ -102,15 +109,19 @@ def build_single_flow_ir(
     Returns:
         A MuleIR for single-flow mode with empty project metadata.
     """
-    return MuleIR(
-        ir_metadata=IRMetadata(
-            source_mode=InputMode.SINGLE_FLOW,
-            source_path=source_path,
-        ),
-        project_metadata=ProjectMetadata(),
-        flows=flows or [],
-        warnings=warnings or [],
-    )
+    with _tracer.start_as_current_span("m2la.ir.build_single_flow") as span:
+        resolved_flows = flows or []
+        span.set_attribute("ir.flows_count", len(resolved_flows))
+        span.set_attribute("ir.steps_count", sum(len(f.steps) for f in resolved_flows))
+        return MuleIR(
+            ir_metadata=IRMetadata(
+                source_mode=InputMode.SINGLE_FLOW,
+                source_path=source_path,
+            ),
+            project_metadata=ProjectMetadata(),
+            flows=resolved_flows,
+            warnings=warnings or [],
+        )
 
 
 def make_source_location(file: str, line: int | None = None, column: int | None = None) -> SourceLocation:

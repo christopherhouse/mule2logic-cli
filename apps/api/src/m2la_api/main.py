@@ -1,12 +1,18 @@
 """MuleSoft to Logic Apps Standard Migration API entrypoint."""
 
-import uvicorn
-from fastapi import Depends, FastAPI
+# ── Telemetry must be initialised BEFORE importing FastAPI ──────────────
+# The Azure Monitor distro monkey-patches frameworks at import time.
+from m2la_api.telemetry import init_telemetry  # noqa: E402
 
-from m2la_api.config.settings import get_settings
-from m2la_api.middleware import verify_api_key
-from m2la_api.models.errors import ApiError, api_error_handler
-from m2la_api.routes import analyze_router, health_router, transform_router, validate_router
+init_telemetry()
+
+import uvicorn  # noqa: E402
+from fastapi import Depends, FastAPI  # noqa: E402
+
+from m2la_api.config.settings import get_settings  # noqa: E402
+from m2la_api.middleware import verify_api_key  # noqa: E402
+from m2la_api.models.errors import ApiError, api_error_handler  # noqa: E402
+from m2la_api.routes import analyze_router, health_router, transform_router, validate_router  # noqa: E402
 
 app = FastAPI(
     title="MuleSoft to Logic Apps Migration API",
