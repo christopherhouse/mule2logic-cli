@@ -162,6 +162,7 @@ class MigrationOrchestrator:
             raise  # Propagate loop-detection error
         except Exception:
             logger.exception("Workflow execution failed")
+            raise
 
         # Derive overall status from step results
         overall_status = AgentStatus.SUCCESS
