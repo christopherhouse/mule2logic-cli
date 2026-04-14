@@ -268,6 +268,13 @@ class MigrationOrchestrator:
                 f"Correlation ID: {cid}"
             )
 
+            logger.info(
+                "Starting migration pipeline [correlation_id=%s, mode=%s, agents=%s]",
+                cid,
+                mode_str,
+                ", ".join(agent.name for agent in self.agents),
+            )
+
             # Estimate prompt tokens for each agent's system prompt + user message
             for agent in self.agents:
                 messages = [
@@ -315,6 +322,16 @@ class MigrationOrchestrator:
                 if step.agent_result.status == AgentStatus.FAILURE:
                     _agent_errors.add(1, {"agent_name": step.step_name})
 
+                # Log step completion
+                logger.info(
+                    "Agent '%s' completed with status=%s in %.1fms",
+                    step.step_name,
+                    step.agent_result.status.value,
+                    step.agent_result.duration_ms,
+                )
+                if step.agent_result.reasoning_summary:
+                    logger.info("  Reasoning: %s", step.agent_result.reasoning_summary[:200])
+
                 # Estimate completion tokens from response text
                 reasoning = step.agent_result.reasoning_summary or ""
                 est_completion = estimate_text_tokens(reasoning)
@@ -338,6 +355,14 @@ class MigrationOrchestrator:
             span.set_attribute("pipeline.duration_ms", total_ms)
 
             _pipeline_requests.add(1, {"status": overall_status.value})
+
+            logger.info(
+                "Pipeline completed [correlation_id=%s, status=%s, steps=%d, duration=%.1fms]",
+                cid,
+                overall_status.value,
+                len(step_results),
+                total_ms,
+            )
 
             return OrchestrationResult(
                 correlation_id=cid,
