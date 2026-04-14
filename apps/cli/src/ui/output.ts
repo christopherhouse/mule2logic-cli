@@ -113,7 +113,9 @@ export function printAnalysisResult(response: AnalyzeResponse): void {
   if (response.gaps.length > 0) {
     console.log(chalk.bold.yellow("  🔍  Migration Gaps:"));
     for (const gap of response.gaps) {
-      const workaround = gap.suggested_workaround ? `\n         Workaround: ${gap.suggested_workaround}` : "";
+      const workaround = gap.suggested_workaround
+        ? `\n         Workaround: ${gap.suggested_workaround}`
+        : "";
       console.log(
         chalk.yellow(
           `      • ${gap.construct_name} [${gap.source_location}]\n         ${gap.message}${workaround}`,
@@ -162,7 +164,9 @@ export function printTransformResult(response: TransformResponse): void {
   if (response.gaps.length > 0) {
     console.log(chalk.bold.yellow("  🔍  Migration Gaps:"));
     for (const gap of response.gaps) {
-      const workaround = gap.suggested_workaround ? `\n         Workaround: ${gap.suggested_workaround}` : "";
+      const workaround = gap.suggested_workaround
+        ? `\n         Workaround: ${gap.suggested_workaround}`
+        : "";
       console.log(
         chalk.yellow(
           `      • ${gap.construct_name} [${gap.source_location}]\n         ${gap.message}${workaround}`,
@@ -176,21 +180,19 @@ export function printTransformResult(response: TransformResponse): void {
   if (response.artifacts.artifacts.length === 0) {
     console.log(chalk.bold.red("  ❌  No artifacts were generated!"));
     console.log(
-      chalk.red(
-        "      This usually indicates that the transformation pipeline encountered errors",
-      ),
+      chalk.red("      This usually indicates that the transformation pipeline encountered errors"),
     );
     console.log(chalk.red("      or the input was not recognized as valid MuleSoft project/flow."));
     console.log();
     console.log(chalk.white("      Check the warnings and gaps above for details."));
     if (response.warnings.length === 0 && response.gaps.length === 0) {
       console.log(
-        chalk.white(
-          "      No warnings/gaps were reported - this may indicate an internal error.",
-        ),
+        chalk.white("      No warnings/gaps were reported - this may indicate an internal error."),
       );
       console.log(
-        chalk.white("      Please report this issue at https://github.com/anthropics/mule2logic-cli/issues"),
+        chalk.white(
+          "      Please report this issue at https://github.com/anthropics/mule2logic-cli/issues",
+        ),
       );
     }
     console.log();
