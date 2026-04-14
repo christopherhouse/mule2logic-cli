@@ -24,9 +24,7 @@ class ValidationIssue(BaseModel):
     location: str | None = Field(
         default=None, description="Location within the artifact (e.g., line number or JSON path)"
     )
-    remediation_hint: str | None = Field(
-        default=None, description="Actionable suggestion for resolving the issue"
-    )
+    remediation_hint: str | None = Field(default=None, description="Actionable suggestion for resolving the issue")
 
 
 class ValidationReport(BaseModel):

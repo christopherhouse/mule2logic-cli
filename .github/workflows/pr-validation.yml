@@ -120,6 +120,10 @@ jobs:
           cache: npm
           cache-dependency-path: apps/cli/package-lock.json
 
+      - name: Build @m2la/contracts dependency
+        working-directory: packages/contracts/typescript
+        run: npm ci && npm run build
+
       - name: Install dependencies
         run: npm ci
 

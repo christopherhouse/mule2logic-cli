@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from m2la_contracts.enums import Severity
+from m2la_contracts.enums import Severity, ValidationCategory
 from m2la_contracts.telemetry import TelemetryContext
 from m2la_contracts.validate import ValidateRequest, ValidationIssue, ValidationReport
 
@@ -47,6 +47,7 @@ class TestValidationIssue:
             rule_id="SCHEMA_001",
             message="Invalid schema",
             severity=Severity.ERROR,
+            category=ValidationCategory.OUTPUT_INTEGRITY,
             artifact_path="workflow.json",
             location="$.definition.triggers",
         )
@@ -58,6 +59,7 @@ class TestValidationIssue:
             rule_id="TEST_001",
             message="test",
             severity=Severity.WARNING,
+            category=ValidationCategory.OUTPUT_INTEGRITY,
         )
         assert issue.artifact_path is None
         assert issue.location is None
@@ -85,6 +87,7 @@ class TestValidationReport:
             rule_id="SCHEMA_001",
             message="bad schema",
             severity=Severity.ERROR,
+            category=ValidationCategory.OUTPUT_INTEGRITY,
         )
         report = ValidationReport(
             valid=False,

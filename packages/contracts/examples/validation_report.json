@@ -5,6 +5,7 @@
       "rule_id": "SCHEMA_001",
       "message": "workflow.json is missing required 'definition' property",
       "severity": "error",
+      "category": "output_integrity",
       "artifact_path": "order-process-flow/workflow.json",
       "location": "$.definition"
     },
@@ -12,6 +13,7 @@
       "rule_id": "CONN_002",
       "message": "Connection reference 'sql-connection' not found in connections.json",
       "severity": "warning",
+      "category": "connector_preference",
       "artifact_path": "order-process-flow/workflow.json",
       "location": "$.definition.actions.Query_Database"
     }
