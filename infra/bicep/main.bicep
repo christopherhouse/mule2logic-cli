@@ -107,6 +107,7 @@ module aiFoundry 'modules/ai-foundry.bicep' = {
     modelDeploymentSkuName: aiModelDeploymentSkuName
     modelDeploymentCapacity: aiModelDeploymentCapacity
     logAnalyticsWorkspaceId: monitoring.outputs.logAnalyticsWorkspaceResourceId
+    uamiPrincipalId: identity.outputs.principalId
   }
 }
 

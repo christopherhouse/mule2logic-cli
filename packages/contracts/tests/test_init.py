@@ -41,4 +41,4 @@ class TestReExports:
 
     def test_all_list_complete(self) -> None:
         """Verify __all__ contains the expected number of exports."""
-        assert len(m2la_contracts.__all__) == 19
+        assert len(m2la_contracts.__all__) == 20

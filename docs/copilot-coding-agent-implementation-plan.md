@@ -1020,7 +1020,11 @@ Add tests for both passing and failing cases in both project mode and single-flo
 
 ---
 
-## PR-012 — Microsoft Agent Framework Orchestration
+## PR-012 — Microsoft Agent Framework Orchestration ✅ COMPLETE
+
+**Completed: 2026-04-14**
+
+Delivered all five specialized agents (AnalyzerAgent, PlannerAgent, TransformerAgent, ValidatorAgent, RepairAdvisorAgent) plus MigrationOrchestrator in `services/agents/`, built on the Microsoft Agent Framework (`agent-framework-core` v1.0.1). Each agent exposes deterministic service functions as callable tools via `Agent(tools=[...])` and has domain-specific system prompts externalized to `prompts/*.md` files (lazy-loaded via `functools.cache`). Online mode composes agents into a `SequentialBuilder` workflow backed by `FoundryChatClient`; offline mode calls each agent's `execute()` directly for tests/CI. `FoundryClientConfig` Pydantic model for SDK connection configuration. 126 tests passing. README documents architecture, online/offline modes, and extension points.
 
 ### Goal
 Wrap deterministic services in agentic orchestration.

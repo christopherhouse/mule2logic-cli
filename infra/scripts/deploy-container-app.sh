@@ -13,8 +13,10 @@
 #   UAMI_RESOURCE_ID          — User Assigned Managed Identity resource ID
 #   UAMI_CLIENT_ID            — User Assigned Managed Identity client ID
 #   APP_INSIGHTS_CONN_STRING  — Application Insights connection string
+#   AI_SERVICES_ENDPOINT      — Azure AI Services endpoint for Foundry
 #
 # Optional:
+#   AI_MODEL                  — Model deployment name (default: gpt-4o)
 #   CAE_NAME                  — Container Apps Environment name
 #                               (default: cae-m2la-${ENVIRONMENT_NAME})
 #   APP_NAME                  — Container App name
@@ -96,7 +98,8 @@ validate_env() {
 
   local missing=0
   for var in RESOURCE_GROUP ENVIRONMENT_NAME ACR_LOGIN_SERVER IMAGE_TAG \
-             UAMI_RESOURCE_ID UAMI_CLIENT_ID APP_INSIGHTS_CONN_STRING; do
+             UAMI_RESOURCE_ID UAMI_CLIENT_ID APP_INSIGHTS_CONN_STRING \
+             AI_SERVICES_ENDPOINT; do
     if [[ -z "${!var:-}" ]]; then
       fail "Required variable ${BOLD}${var}${RESET}${RED} is not set"
       missing=1
@@ -111,6 +114,7 @@ validate_env() {
 apply_defaults() {
   CAE_NAME="${CAE_NAME:-cae-m2la-${ENVIRONMENT_NAME}}"
   APP_NAME="${APP_NAME:-ca-m2la-api-${ENVIRONMENT_NAME}}"
+  AI_MODEL="${AI_MODEL:-gpt-4o}"
   TARGET_PORT="${TARGET_PORT:-8000}"
   CPU="${CPU:-0.5}"
   MEMORY="${MEMORY:-1Gi}"
@@ -175,6 +179,8 @@ create_app() {
     --env-vars \
       "APPLICATIONINSIGHTS_CONNECTION_STRING=${APP_INSIGHTS_CONN_STRING}" \
       "AZURE_CLIENT_ID=${UAMI_CLIENT_ID}" \
+      "AZURE_AI_FOUNDRY_ENDPOINT=${AI_SERVICES_ENDPOINT}" \
+      "AZURE_AI_MODEL=${AI_MODEL}" \
       "ENVIRONMENT=${ENVIRONMENT_NAME}" \
     --tags "project=mule2logic" "environment=${ENVIRONMENT_NAME}" "managedBy=script" \
     --output none
@@ -215,6 +221,8 @@ update_app() {
     --set-env-vars \
       "APPLICATIONINSIGHTS_CONNECTION_STRING=${APP_INSIGHTS_CONN_STRING}" \
       "AZURE_CLIENT_ID=${UAMI_CLIENT_ID}" \
+      "AZURE_AI_FOUNDRY_ENDPOINT=${AI_SERVICES_ENDPOINT}" \
+      "AZURE_AI_MODEL=${AI_MODEL}" \
       "ENVIRONMENT=${ENVIRONMENT_NAME}" \
     --output none
 

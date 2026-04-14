@@ -17,6 +17,9 @@ param modelDeploymentSkuName string = 'GlobalStandard'
 @description('Capacity (K TPM) for the GPT-4o model deployment.')
 param modelDeploymentCapacity int = 30
 
+@description('Principal ID of the User Assigned Managed Identity to grant Cognitive Services OpenAI User role.')
+param uamiPrincipalId string = ''
+
 @description('Resource ID of the Log Analytics workspace for diagnostic settings.')
 param logAnalyticsWorkspaceId string = ''
 
@@ -79,6 +82,20 @@ resource diagnosticSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-pr
         enabled: true
       }
     ]
+  }
+}
+
+// ---------------------------------------------------------------------------
+// RBAC — Grant UAMI the Cognitive Services OpenAI User role
+// ---------------------------------------------------------------------------
+
+resource uamiOpenAiRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(uamiPrincipalId)) {
+  name: guid(aiServices.id, uamiPrincipalId, '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd')
+  scope: aiServices
+  properties: {
+    principalId: uamiPrincipalId
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd')
+    principalType: 'ServicePrincipal'
   }
 }
 

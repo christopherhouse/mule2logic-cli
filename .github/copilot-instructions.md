@@ -16,6 +16,24 @@ The platform converts MuleSoft (Anypoint) projects into Azure Logic Apps Standar
 
 Key components: CLI (TypeScript), API (Python FastAPI), IR Engine, Validator, Agent Orchestrator (Microsoft Agent Framework). See `docs/mule2logic-cli-spec.md` §3 for details.
 
+## AI/Agent Framework
+
+- **Microsoft Agent Framework (`agent-framework`) exclusively** for all AI agent development. This is the only approved AI/agent SDK.
+  - Package: `agent-framework-core` (core + orchestrations), `agent-framework-foundry` (Azure AI Foundry integration)
+  - Reference: https://github.com/microsoft/agent-framework/blob/main/python/README.md
+- **Do not use** any other AI agent SDK including but not limited to:
+  - `azure-ai-agents` (Azure AI Agent Service SDK)
+  - Semantic Kernel (`semantic-kernel`)
+  - AutoGen (`autogen`, `pyautogen`)
+  - LangChain, LangGraph, CrewAI, or any third-party agent framework
+- Agent patterns:
+  - `Agent(client=..., name=..., instructions=..., tools=[...])` for single agents
+  - `SequentialBuilder(participants=[...]).build()` for sequential multi-agent workflows
+  - `HandoffBuilder`, `ConcurrentBuilder`, `GroupChatBuilder` for other orchestration patterns
+  - `FoundryChatClient` for Azure AI Foundry integration
+  - Plain Python functions as tools via `tools=[func1, func2]` parameter
+- Agent orchestration code lives in `services/agents/`
+
 ## Tech Stack Rules
 
 ### Python (backend, services)
