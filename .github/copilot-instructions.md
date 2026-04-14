@@ -135,11 +135,11 @@ When implementing or reviewing code, use available MCP servers to validate again
 
 Prefer these over general web search for any library, SDK, or Azure service documentation. Your training data may not reflect recent API changes.
 
-## PR Workflow
+## Development Workflow
 
-- Every feature PR must include tests.
-- After completing a PR, update `docs/copilot-coding-agent-implementation-plan.md`:
+- Every feature implemented or changesd must include supporting tests.
+- After completing a task from the user, update `docs/copilot-coding-agent-implementation-plan.md`:
   - Mark the PR heading with `✅ COMPLETE`
   - Add a brief completion note (date, deviations, follow-ups)
-- Before starting a PR, re-read its section in the implementation plan — requirements may have been updated.
-- Keep PRs small and independently reviewable.
+- Before starting a task, re-read its section in the implementation plan — requirements may have been updated.
+- Keep changes small and independently reviewable.
