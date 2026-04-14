@@ -32,7 +32,16 @@ from m2la_agents.grounding import (
     search_logic_apps_docs,
     search_mulesoft_docs,
 )
-from m2la_agents.models import AgentContext, AgentResult, AgentStatus, MigrationPlan, OrchestrationResult, StepResult
+from m2la_agents.models import (
+    AgentContext,
+    AgentResult,
+    AgentStatus,
+    MigrationPlan,
+    OrchestrationResult,
+    StepResult,
+    StreamingEvent,
+    StreamingEventType,
+)
 from m2la_agents.orchestrator import MigrationOrchestrator
 from m2la_agents.planner import PlannerAgent
 from m2la_agents.prompts import (
@@ -59,6 +68,8 @@ __all__ = [
     "OrchestrationResult",
     "RepairSuggestion",
     "StepResult",
+    "StreamingEvent",
+    "StreamingEventType",
     # Config
     "FoundryClientConfig",
     # Agents

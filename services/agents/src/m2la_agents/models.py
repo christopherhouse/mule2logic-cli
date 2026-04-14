@@ -27,6 +27,33 @@ class AgentStatus(StrEnum):
     PARTIAL = "partial"
 
 
+class StreamingEventType(StrEnum):
+    """Types of streaming events emitted during pipeline execution."""
+
+    AGENT_STARTED = "agent_started"
+    AGENT_PROGRESS = "agent_progress"
+    AGENT_COMPLETED = "agent_completed"
+    TOOL_CALL = "tool_call"
+    ERROR = "error"
+    COMPLETE = "complete"
+
+
+class StreamingEvent(BaseModel):
+    """Event emitted during streaming pipeline execution.
+
+    Provides real-time progress updates as agents execute, allowing
+    clients to display incremental progress instead of waiting for
+    the entire pipeline to complete.
+    """
+
+    event_type: StreamingEventType = Field(..., description="Type of streaming event")
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC), description="When this event occurred")
+    correlation_id: str = Field(..., description="Correlation ID for the pipeline run")
+    agent_name: str | None = Field(default=None, description="Name of the agent that generated this event")
+    data: dict[str, Any] = Field(default_factory=dict, description="Event-specific payload")
+    message: str | None = Field(default=None, description="Human-readable progress message")
+
+
 class AgentContext(BaseModel):
     """Context object threaded through the agent pipeline.
 
