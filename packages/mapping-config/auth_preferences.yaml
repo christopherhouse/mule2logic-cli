@@ -1,0 +1,15 @@
+# Auth Preference Ranking Rules
+#
+# Defines the priority order for connector authentication types and
+# Logic Apps connector types used during mapping resolution.
+#
+# Lower numeric value = higher priority (preferred first).
+
+auth_priority:
+  - managed-identity   # 1 — preferred: no secrets, uses Azure RBAC
+  - none               # 2 — acceptable for public/unauthenticated endpoints
+  - api-key            # 3 — last resort: requires secret management
+
+connector_type_priority:
+  - built-in           # 1 — preferred: serviceProviderConnections, lower latency, managed by runtime
+  - managed            # 2 — last resort: managedApiConnections, external API gateway, higher cost
