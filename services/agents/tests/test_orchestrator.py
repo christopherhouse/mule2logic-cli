@@ -6,7 +6,9 @@ Includes both unit tests (mocked services) and integration tests
 
 from __future__ import annotations
 
+from collections.abc import Callable, Sequence
 from pathlib import Path
+from typing import Any
 
 from m2la_agents.base import BaseAgent
 from m2la_agents.models import AgentContext, AgentResult, AgentStatus
@@ -23,7 +25,7 @@ class _SuccessAgent(BaseAgent):
     def __init__(self, name: str = "SuccessAgent") -> None:
         super().__init__(name=name)
 
-    def _get_tools(self):  # noqa: ANN201
+    def _get_tools(self) -> Sequence[Callable[..., Any]]:
         return []  # No tools for test agent
 
     def execute(self, context: AgentContext) -> AgentResult:
@@ -43,7 +45,7 @@ class _FailureAgent(BaseAgent):
     def __init__(self, name: str = "FailureAgent") -> None:
         super().__init__(name=name)
 
-    def _get_tools(self):  # noqa: ANN201
+    def _get_tools(self) -> Sequence[Callable[..., Any]]:
         return []  # No tools for test agent
 
     def execute(self, context: AgentContext) -> AgentResult:
@@ -62,7 +64,7 @@ class _PartialAgent(BaseAgent):
     def __init__(self, name: str = "PartialAgent") -> None:
         super().__init__(name=name)
 
-    def _get_tools(self):  # noqa: ANN201
+    def _get_tools(self) -> Sequence[Callable[..., Any]]:
         return []  # No tools for test agent
 
     def execute(self, context: AgentContext) -> AgentResult:

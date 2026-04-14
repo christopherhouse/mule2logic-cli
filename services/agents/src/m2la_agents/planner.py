@@ -12,6 +12,8 @@ mapping availability for each construct, and produces a structured
 from __future__ import annotations
 
 import time
+from collections.abc import Callable, Sequence
+from typing import Any
 
 from m2la_ir.models import (
     ConnectorOperation,
@@ -89,7 +91,7 @@ class PlannerAgent(BaseAgent):
             instructions=planner_prompt(),
         )
 
-    def _get_tools(self):  # noqa: ANN201
+    def _get_tools(self) -> Sequence[Callable[..., Any]]:
         """Return the ``create_migration_plan`` function as a tool."""
         from m2la_agents.function_tools import create_migration_plan
 

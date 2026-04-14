@@ -15,7 +15,9 @@ This agent composes those services into a single step that:
 from __future__ import annotations
 
 import time
+from collections.abc import Callable, Sequence
 from pathlib import Path
+from typing import Any
 
 from m2la_contracts.enums import InputMode
 from m2la_contracts.helpers import detect_input_mode
@@ -152,7 +154,7 @@ class AnalyzerAgent(BaseAgent):
             instructions=analyzer_prompt(),
         )
 
-    def _get_tools(self):  # noqa: ANN201
+    def _get_tools(self) -> Sequence[Callable[..., Any]]:
         """Return the ``analyze_mule_input`` function as a tool."""
         from m2la_agents.function_tools import analyze_mule_input
 

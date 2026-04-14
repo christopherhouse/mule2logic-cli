@@ -12,6 +12,7 @@ transform function based on input mode.
 from __future__ import annotations
 
 import time
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -47,7 +48,7 @@ class TransformerAgent(BaseAgent):
             instructions=transformer_prompt(),
         )
 
-    def _get_tools(self):  # noqa: ANN201
+    def _get_tools(self) -> Sequence[Callable[..., Any]]:
         """Return the ``transform_to_logic_apps`` function as a tool."""
         from m2la_agents.function_tools import transform_to_logic_apps
 

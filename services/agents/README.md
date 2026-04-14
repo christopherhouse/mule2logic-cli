@@ -2,39 +2,38 @@
 
 **Multi-agent orchestration** layer for the MuleSoft → Logic Apps migration
 platform, powered by the
-[Azure AI Agents SDK](https://learn.microsoft.com/en-us/azure/ai-services/agents/)
-(`azure-ai-agents`) and the
-[ConnectedAgentTool](https://learn.microsoft.com/en-us/azure/foundry-classic/agents/how-to/connected-agents)
-multi-agent pattern.
+[Microsoft Agent Framework](https://github.com/microsoft/agent-framework)
+(`agent-framework-core`) and the
+[SequentialBuilder](https://github.com/microsoft/agent-framework)
+multi-agent orchestration pattern.
 
 ## Architecture Overview
 
-The orchestrator implements true **multi-agent orchestration** where a main
-orchestrator agent delegates to specialized sub-agents via the Azure AI Agent
-Service.
+The orchestrator implements **multi-agent orchestration** where agents are
+composed into a sequential workflow using the Microsoft Agent Framework (MAF).
 
-Each sub-agent:
-- Has rich **system prompts** (`prompts.py`) with domain-specific instructions
-- Registers deterministic services as **`FunctionTool`** callables via `ToolSet`
-- Is created on the Azure AI Agent Service via `AgentsClient.create_agent()`
-- Is wired to the orchestrator as a **`ConnectedAgentTool`** for LLM-driven delegation
+Each agent:
+- Has rich **system prompts** (loaded from `prompts/*.md`) with domain-specific instructions
+- Returns deterministic services as callable **tool functions** via `_get_tools()`
+- Can be constructed as a MAF `Agent` via `build_maf_agent(client)`
+- Is composed into a `SequentialBuilder` workflow for LLM-driven orchestration
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                         Azure AI Agent Service                         │
+│                   Microsoft Agent Framework (MAF)                       │
 │                                                                        │
 │  ┌──────────────────────────────────────────────────────────────────┐  │
-│  │              MigrationOrchestrator Agent (main)                  │  │
-│  │              Instructions: ORCHESTRATOR_PROMPT                    │  │
-│  │              Tools: ConnectedAgentTool × 5 sub-agents           │  │
+│  │              SequentialBuilder Workflow                          │  │
+│  │              [Analyzer → Planner → Transformer → Validator →    │  │
+│  │               RepairAdvisor]                                     │  │
 │  └──────────┬───────────┬───────────┬───────────┬──────────────────┘  │
 │             │           │           │           │                      │
 │    ┌────────▼──┐  ┌─────▼─────┐  ┌─▼──────────┐ ┌──▼───────┐         │
 │    │ Analyzer  │  │  Planner  │  │ Transformer │ │Validator │  ┌────┐ │
 │    │ Agent     │  │  Agent    │  │ Agent       │ │Agent     │  │Rep.│ │
 │    │           │  │           │  │             │ │          │  │Adv.│ │
-│    │ FuncTool: │  │ FuncTool: │  │ FuncTool:   │ │FuncTool: │  │    │ │
-│    │ analyze   │  │ plan      │  │ transform   │ │validate  │  │    │ │
+│    │ tools:    │  │ tools:    │  │ tools:      │ │tools:    │  │    │ │
+│    │ [analyze] │  │ [plan]    │  │ [transform] │ │[validate]│  │    │ │
 │    └─────┬─────┘  └─────┬─────┘  └──────┬─────┘ └────┬─────┘  └──┬─┘ │
 │          │              │               │             │            │   │
 │  ┌───────▼──────────────▼───────────────▼─────────────▼────────────▼─┐ │
@@ -43,51 +42,43 @@ Each sub-agent:
 │  └──────────────────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────────────────┘
 
-Thread: user message → orchestrator reasons → delegates to sub-agents →
-        sub-agents invoke FunctionTools → orchestrator compiles response
+Workflow: user message → agents process sequentially → each agent invokes
+          tool functions → final agent produces migration summary
 ```
 
 ## Multi-Agent Orchestration (Online Mode)
 
-In online mode, the orchestrator creates a proper multi-agent setup:
+In online mode, the orchestrator uses the Microsoft Agent Framework:
 
-1. **Create sub-agents** — Each agent (`AnalyzerAgent`, `PlannerAgent`, etc.)
-   is created on the Azure AI Agent Service with its `FunctionTool` and
-   domain-specific system prompt.
+1. **Build MAF agents** — Each agent (`AnalyzerAgent`, `PlannerAgent`, etc.)
+   is constructed as a MAF `Agent` with its tool functions and domain-specific
+   system prompt via `build_maf_agent(client)`.
 
-2. **Wire as ConnectedAgentTool** — Sub-agents are registered as
-   `ConnectedAgentTool` definitions on the main orchestrator agent, enabling
-   the LLM to delegate tasks via natural language routing.
+2. **Compose with SequentialBuilder** — Agents are composed into a sequential
+   workflow using `SequentialBuilder(participants=[...]).build()`.
 
-3. **Create orchestrator agent** — A main `MigrationOrchestrator` agent is
-   created with the `ORCHESTRATOR_PROMPT` and connected sub-agents as tools.
+3. **Run workflow** — The workflow is executed with a user message describing
+   the migration request.  Each agent reasons about its task, invokes tool
+   functions, and passes results to the next agent.
 
-4. **Thread + message** — A conversation thread is created with a rich user
-   message describing the migration request (input path, mode, correlation ID).
-
-5. **Run** — The orchestrator agent run is executed. The LLM reasons about the
-   migration pipeline, delegates to sub-agents, and compiles results.
-
-6. **Structured output** — The deterministic `execute()` path is also run
+4. **Structured output** — The deterministic `execute()` path is also run
    to produce structured `AgentResult` objects. The LLM's reasoning is
    attached as `orchestrator_reasoning` in the final output.
 
-7. **Cleanup** — All agents (orchestrator + sub-agents) are deleted from the
-   service.
-
 ```python
-from azure.ai.agents import AgentsClient
-from azure.identity import DefaultAzureCredential
+from agent_framework.foundry import FoundryChatClient
+from azure.identity import AzureCliCredential
 
-from m2la_agents import AgentsClientConfig, MigrationOrchestrator
+from m2la_agents import FoundryClientConfig, MigrationOrchestrator
 
-client = AgentsClient(
-    endpoint="https://<project>.api.azureml.ms",
-    credential=DefaultAzureCredential(),
+client = FoundryChatClient(
+    project_endpoint="https://<project>.api.azureml.ms",
+    model="gpt-4o",
+    credential=AzureCliCredential(),
 )
-config = AgentsClientConfig(
+config = FoundryClientConfig(
     endpoint="https://<project>.api.azureml.ms",
-    model_deployment="gpt-4o",
+    model="gpt-4o",
 )
 
 orchestrator = MigrationOrchestrator(client=client, config=config)
@@ -96,7 +87,7 @@ result = orchestrator.run(
     output_directory="/path/to/output",
 )
 
-# LLM reasoning from the orchestrator agent
+# LLM reasoning from the workflow
 if isinstance(result.final_output, dict):
     print(result.final_output.get("orchestrator_reasoning"))
 ```
@@ -119,16 +110,16 @@ for step in result.steps:
 
 ## System Prompts
 
-Each agent has a rich, domain-specific system prompt in `prompts.py`:
+Each agent has a rich, domain-specific system prompt loaded from `prompts/*.md`:
 
-| Prompt | Agent | Purpose |
-|--------|-------|---------|
-| `ORCHESTRATOR_PROMPT` | Main orchestrator | Pipeline coordination, delegation rules, output format |
-| `ANALYZER_PROMPT` | AnalyzerAgent | Input parsing, IR building, validation reporting |
-| `PLANNER_PROMPT` | PlannerAgent | Mapping evaluation, plan generation, gap estimation |
-| `TRANSFORMER_PROMPT` | TransformerAgent | IR→Logic Apps conversion, gap tracking |
-| `VALIDATOR_PROMPT` | ValidatorAgent | Schema validation, issue reporting |
-| `REPAIR_ADVISOR_PROMPT` | RepairAdvisorAgent | Issue analysis, repair suggestion, confidence levels |
+| Prompt File | Agent | Purpose |
+|-------------|-------|---------|
+| `orchestrator.md` | Main orchestrator | Pipeline coordination, delegation rules, output format |
+| `analyzer.md` | AnalyzerAgent | Input parsing, IR building, validation reporting |
+| `planner.md` | PlannerAgent | Mapping evaluation, plan generation, gap estimation |
+| `transformer.md` | TransformerAgent | IR→Logic Apps conversion, gap tracking |
+| `validator.md` | ValidatorAgent | Schema validation, issue reporting |
+| `repair_advisor.md` | RepairAdvisorAgent | Issue analysis, repair suggestion, confidence levels |
 
 ## Data Flow
 
@@ -163,22 +154,22 @@ AgentContext (correlation_id, input_path, accumulated_data)
 
 ## Configuration
 
-`AgentsClientConfig` controls the SDK connection:
+`FoundryClientConfig` controls the MAF connection:
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `endpoint` | `str \| None` | `None` | Azure AI Foundry project endpoint.  When `None` → offline mode. |
-| `model_deployment` | `str` | `"gpt-4o"` | Model deployment name for agent LLM backing. |
+| `model` | `str` | `"gpt-4o"` | Model deployment name for agent LLM backing. |
 
 ## Agent Descriptions
 
-| Agent | Responsibility | FunctionTool | ConnectedAgentTool Description |
-|-------|---------------|-------------|-------------------------------|
-| **AnalyzerAgent** | Parse input, build IR, validate input | `analyze_mule_input` | "Parses and analyzes MuleSoft input..." |
-| **PlannerAgent** | Evaluate mapping availability, create plan | `create_migration_plan` | "Evaluates mapping availability..." |
-| **TransformerAgent** | Generate Logic Apps artifacts from IR | `transform_to_logic_apps` | "Converts the MuleSoft IR into Logic Apps..." |
-| **ValidatorAgent** | Validate generated output artifacts | `validate_output_artifacts` | "Validates generated Logic Apps artifacts..." |
-| **RepairAdvisorAgent** | Suggest fixes for issues and gaps | `suggest_repairs` | "Analyzes validation failures and migration gaps..." |
+| Agent | Responsibility | Tool Function |
+|-------|---------------|--------------|
+| **AnalyzerAgent** | Parse input, build IR, validate input | `analyze_mule_input` |
+| **PlannerAgent** | Evaluate mapping availability, create plan | `create_migration_plan` |
+| **TransformerAgent** | Generate Logic Apps artifacts from IR | `transform_to_logic_apps` |
+| **ValidatorAgent** | Validate generated output artifacts | `validate_output_artifacts` |
+| **RepairAdvisorAgent** | Suggest fixes for issues and gaps | `suggest_repairs` |
 
 ## Where Deterministic Logic Ends and AI Begins
 
@@ -188,20 +179,20 @@ AgentContext (correlation_id, input_path, accumulated_data)
   validate output — all with predictable, testable behaviour.
 
 - **Agent orchestration** lives here in `m2la_agents`. Each agent has a rich
-  system prompt and deterministic `FunctionTool` callables.
+  system prompt and deterministic tool functions registered via `_get_tools()`.
 
-- **AI-driven orchestration** happens in online mode. The main orchestrator
-  agent uses LLM reasoning to delegate to sub-agents via `ConnectedAgentTool`,
-  coordinate the pipeline, and produce a coherent migration summary. The LLM
-  adds reasoning, explanations, and recommendations on top of the deterministic
-  tool outputs.
+- **AI-driven orchestration** happens in online mode. A `SequentialBuilder`
+  workflow chains agents together, allowing each agent's LLM to reason about
+  its task, invoke tool functions, and produce results for the next agent.
+  The LLM adds reasoning, explanations, and recommendations on top of the
+  deterministic tool outputs.
 
 ## Development
 
 ```bash
 cd services/agents
 uv sync
-uv run pytest -v          # 142 tests
+uv run pytest -v          # 126 tests
 uv run ruff check src/ tests/
 uv run ruff format --check src/ tests/
 ```
