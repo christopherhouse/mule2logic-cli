@@ -17,6 +17,8 @@ dependencies = [
     "azure-identity",
     "python-multipart>=0.0.26",
     "aiohttp>=3.9",
+    "azure-monitor-opentelemetry>=1.6",
+    "opentelemetry-api>=1.20",
 ]
 
 [tool.uv.sources]

@@ -13,11 +13,21 @@ from __future__ import annotations
 
 import json
 import logging
+import time
+
+from opentelemetry import metrics, trace
 
 from m2la_agents.grounding.context7 import Context7Client
 from m2la_agents.grounding.microsoft_learn import MicrosoftLearnClient
 
 logger = logging.getLogger(__name__)
+
+_tracer = trace.get_tracer("m2la.grounding")
+_meter = metrics.get_meter("m2la.grounding")
+_grounding_calls = _meter.create_counter("m2la.grounding.calls", description="Grounding API calls", unit="1")
+_grounding_latency = _meter.create_histogram(
+    "m2la.grounding.latency_ms", description="Grounding call latency in ms", unit="ms"
+)
 
 # ---------------------------------------------------------------------------
 # Lazy-initialised singleton clients
@@ -69,11 +79,21 @@ def search_logic_apps_docs(query: str) -> str:
         JSON string with search results containing title, url, content,
         and source.
     """
+    start = time.monotonic()
     try:
-        client = _get_ms_learn_client()
-        response = client.search(f"Azure Logic Apps Standard {query}")
-        return response.model_dump_json()
+        with _tracer.start_as_current_span("m2la.grounding.microsoft_learn") as span:
+            span.set_attribute("provider", "microsoft_learn")
+            span.set_attribute("query.length", len(query))
+            client = _get_ms_learn_client()
+            response = client.search(f"Azure Logic Apps Standard {query}")
+            elapsed = (time.monotonic() - start) * 1000
+            _grounding_calls.add(1, {"provider": "microsoft_learn", "status": "success"})
+            _grounding_latency.record(elapsed, {"provider": "microsoft_learn"})
+            return response.model_dump_json()
     except Exception:
+        elapsed = (time.monotonic() - start) * 1000
+        _grounding_calls.add(1, {"provider": "microsoft_learn", "status": "error"})
+        _grounding_latency.record(elapsed, {"provider": "microsoft_learn"})
         logger.exception("search_logic_apps_docs failed for query: %r", query)
         return json.dumps({"query": query, "provider": "microsoft_learn", "results": [], "error": "Search failed"})
 
@@ -90,11 +110,21 @@ def fetch_logic_apps_doc(url: str) -> str:
     Returns:
         JSON string with the page content.
     """
+    start = time.monotonic()
     try:
-        client = _get_ms_learn_client()
-        response = client.fetch_page(url)
-        return response.model_dump_json()
+        with _tracer.start_as_current_span("m2la.grounding.microsoft_learn_fetch") as span:
+            span.set_attribute("provider", "microsoft_learn")
+            span.set_attribute("url.host", "learn.microsoft.com")
+            client = _get_ms_learn_client()
+            response = client.fetch_page(url)
+            elapsed = (time.monotonic() - start) * 1000
+            _grounding_calls.add(1, {"provider": "microsoft_learn", "status": "success"})
+            _grounding_latency.record(elapsed, {"provider": "microsoft_learn"})
+            return response.model_dump_json()
     except Exception:
+        elapsed = (time.monotonic() - start) * 1000
+        _grounding_calls.add(1, {"provider": "microsoft_learn", "status": "error"})
+        _grounding_latency.record(elapsed, {"provider": "microsoft_learn"})
         logger.exception("fetch_logic_apps_doc failed for url: %s", url)
         return json.dumps({"query": url, "provider": "microsoft_learn", "results": [], "error": "Fetch failed"})
 
@@ -115,11 +145,22 @@ def search_mulesoft_docs(query: str, library: str = "connectors") -> str:
     Returns:
         JSON string with documentation content from Context7.
     """
+    start = time.monotonic()
     try:
-        client = _get_context7_client()
-        library_id = Context7Client.MULESOFT_LIBRARIES.get(library)
-        response = client.get_documentation(query, library_id=library_id)
-        return response.model_dump_json()
+        with _tracer.start_as_current_span("m2la.grounding.context7") as span:
+            span.set_attribute("provider", "context7")
+            span.set_attribute("query.length", len(query))
+            span.set_attribute("library", library)
+            client = _get_context7_client()
+            library_id = Context7Client.MULESOFT_LIBRARIES.get(library)
+            response = client.get_documentation(query, library_id=library_id)
+            elapsed = (time.monotonic() - start) * 1000
+            _grounding_calls.add(1, {"provider": "context7", "status": "success"})
+            _grounding_latency.record(elapsed, {"provider": "context7"})
+            return response.model_dump_json()
     except Exception:
+        elapsed = (time.monotonic() - start) * 1000
+        _grounding_calls.add(1, {"provider": "context7", "status": "error"})
+        _grounding_latency.record(elapsed, {"provider": "context7"})
         logger.exception("search_mulesoft_docs failed for query: %r, library: %r", query, library)
         return json.dumps({"query": query, "provider": "context7", "results": [], "error": "Search failed"})

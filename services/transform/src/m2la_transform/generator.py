@@ -10,9 +10,22 @@ from typing import Any
 from m2la_contracts.common import MigrationGap
 from m2la_ir.enums import ConnectorType, FlowKind
 from m2la_ir.models import ConnectorOperation, Flow, MuleIR, Router, Scope
+from opentelemetry import metrics, trace
 
 from m2la_transform.models import ProjectArtifacts
 from m2la_transform.workflow_generator import generate_workflow
+
+_tracer = trace.get_tracer("m2la.transform")
+_meter = metrics.get_meter("m2la.transform")
+_workflows_generated = _meter.create_counter(
+    "m2la.transform.workflows_generated", description="Total workflows generated", unit="1"
+)
+_migration_gaps = _meter.create_counter(
+    "m2la.transform.migration_gaps", description="Migration gaps encountered", unit="1"
+)
+_artifacts_generated = _meter.create_counter(
+    "m2la.transform.artifacts_generated", description="Total artifact files generated", unit="1"
+)
 
 # ── Static artifacts ──────────────────────────────────────────────────────────
 
@@ -174,50 +187,63 @@ def generate_project(
     Returns:
         A tuple of (ProjectArtifacts, list[MigrationGap]).
     """
-    all_gaps: list[MigrationGap] = []
+    with _tracer.start_as_current_span("m2la.transform.generate_project") as span:
+        span.set_attribute("transform.mode", "project")
+        all_gaps: list[MigrationGap] = []
 
-    # 1. Static host.json (deep-copy to keep _HOST_JSON immutable)
-    host_json: dict[str, Any] = dict(_HOST_JSON)
+        # 1. Static host.json (deep-copy to keep _HOST_JSON immutable)
+        host_json: dict[str, Any] = dict(_HOST_JSON)
 
-    # 2. Connector discovery → connections.json
-    connector_types = _collect_connector_types(ir.flows)
-    connections_json = _build_connections_json(connector_types)
+        # 2. Connector discovery → connections.json
+        connector_types = _collect_connector_types(ir.flows)
+        connections_json = _build_connections_json(connector_types)
 
-    # 3. parameters.json
-    parameters_json = _build_parameters_json(connector_types)
+        # 3. parameters.json
+        parameters_json = _build_parameters_json(connector_types)
 
-    # 4. .env — mock values only
-    env_content = _ENV_CONTENT
+        # 4. .env — mock values only
+        env_content = _ENV_CONTENT
 
-    # 5. Build sub-flow lookup for flow-ref resolution
-    sub_flows: dict[str, Flow] = {flow.name: flow for flow in ir.flows if flow.kind == FlowKind.SUB_FLOW}
+        # 5. Build sub-flow lookup for flow-ref resolution
+        sub_flows: dict[str, Flow] = {flow.name: flow for flow in ir.flows if flow.kind == FlowKind.SUB_FLOW}
 
-    # 6. Per-flow workflow generation
-    workflows: dict[str, dict[str, Any]] = {}
-    for flow in ir.flows:
-        workflow_name = _sanitize_workflow_name(flow.name)
-        workflow_dict, flow_gaps = generate_workflow(flow, sub_flows=sub_flows)
-        all_gaps.extend(flow_gaps)
-        workflows[workflow_name] = workflow_dict
+        # 6. Per-flow workflow generation
+        workflows: dict[str, dict[str, Any]] = {}
+        for flow in ir.flows:
+            workflow_name = _sanitize_workflow_name(flow.name)
+            workflow_dict, flow_gaps = generate_workflow(flow, sub_flows=sub_flows)
+            all_gaps.extend(flow_gaps)
+            workflows[workflow_name] = workflow_dict
 
-    # 6. Write files
-    output_dir.mkdir(parents=True, exist_ok=True)
-    _write_json(output_dir / "host.json", host_json)
-    _write_json(output_dir / "connections.json", connections_json)
-    _write_json(output_dir / "parameters.json", parameters_json)
-    (output_dir / ".env").write_text(env_content, encoding="utf-8")
+        # 6. Write files
+        output_dir.mkdir(parents=True, exist_ok=True)
+        _write_json(output_dir / "host.json", host_json)
+        _write_json(output_dir / "connections.json", connections_json)
+        _write_json(output_dir / "parameters.json", parameters_json)
+        (output_dir / ".env").write_text(env_content, encoding="utf-8")
 
-    for workflow_name, workflow_dict in workflows.items():
-        wf_dir = output_dir / "workflows" / workflow_name
-        wf_dir.mkdir(parents=True, exist_ok=True)
-        _write_json(wf_dir / "workflow.json", workflow_dict)
+        for workflow_name, workflow_dict in workflows.items():
+            wf_dir = output_dir / "workflows" / workflow_name
+            wf_dir.mkdir(parents=True, exist_ok=True)
+            _write_json(wf_dir / "workflow.json", workflow_dict)
 
-    artifacts = ProjectArtifacts(
-        host_json=host_json,
-        connections_json=connections_json,
-        parameters_json=parameters_json,
-        env_content=env_content,
-        workflows=workflows,
-    )
+        artifacts = ProjectArtifacts(
+            host_json=host_json,
+            connections_json=connections_json,
+            parameters_json=parameters_json,
+            env_content=env_content,
+            workflows=workflows,
+        )
 
-    return artifacts, all_gaps
+        # Emit metrics
+        workflow_count = len(workflows)
+        gap_count = len(all_gaps)
+        # 4 static files + 1 per workflow
+        artifact_count = 4 + workflow_count
+        span.set_attribute("artifacts.count", artifact_count)
+        span.set_attribute("gaps.count", gap_count)
+        _workflows_generated.add(workflow_count)
+        _migration_gaps.add(gap_count)
+        _artifacts_generated.add(artifact_count)
+
+        return artifacts, all_gaps
