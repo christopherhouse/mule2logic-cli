@@ -953,7 +953,19 @@ Include at least one golden test for single-flow mode (standalone XML → standa
 
 ---
 
-## PR-011 — Validation Engine v1
+## PR-011 — Validation Engine v1 ✅ COMPLETE
+
+**Completed: 2026-04-14**
+
+Delivered full validation engine with 69 tests:
+- Added `ValidationCategory` enum and `remediation_hint` field to contracts
+- Mule input validation: project completeness (pom.xml, flow XMLs), single-flow XML validity, external config-ref/property detection
+- IR integrity validation: trigger presence, flow-ref resolution, variable tracking, recursive router/scope/error-handler validation
+- Output integrity validation: file layout, host.json/connections.json structure, .env placeholder vars, workflow.json schema, runAfter references, connector preference warnings
+- Engine orchestrator with `validate_all` convenience function combining all stages
+- Single-flow mode: external references produce warnings (not errors) per spec §4
+- Made `telemetry` optional in `ValidationReport` for service-layer use (API layer still sets it)
+- No deviations from scope. Follow-up: integrate validation into the transform endpoint (can be added as optional flag in a future PR).
 
 ### Goal
 Add deterministic validation before and after generation.
