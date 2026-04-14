@@ -1,11 +1,15 @@
 """Transform route — converts a MuleSoft project or single flow to Logic Apps artifacts."""
 
-import uuid
+from __future__ import annotations
 
-from fastapi import APIRouter
+import asyncio
+import logging
+import uuid
+from typing import Any
+
+from fastapi import APIRouter, Depends
+from m2la_agents import MigrationOrchestrator
 from m2la_contracts import (
-    ArtifactManifest,
-    ConstructCount,
     InputMode,
     TelemetryContext,
     TransformRequest,
@@ -13,15 +17,24 @@ from m2la_contracts import (
     detect_input_mode,
 )
 
+from m2la_api.dependencies import get_chat_client
+from m2la_api.models.errors import ApiError
+from m2la_api.services.result_mapper import map_transform_result
+
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
 
 
 @router.post("/transform", response_model=TransformResponse)
-async def transform(request: TransformRequest) -> TransformResponse:
+async def transform(
+    request: TransformRequest,
+    chat_client: Any = Depends(get_chat_client),
+) -> TransformResponse:
     """Transform a MuleSoft project or single flow XML into Logic Apps artifacts.
 
-    Auto-detects input mode from the path when ``mode`` is not provided.
-    Returns a placeholder response conforming to the contract.
+    Runs the full 5-agent pipeline (Analyzer → Planner → Transformer →
+    Validator → RepairAdvisor) through the MigrationOrchestrator.
     """
     mode: InputMode = request.mode if request.mode is not None else detect_input_mode(request.input_path)
     output_dir = request.output_directory or "./output"
@@ -32,16 +45,28 @@ async def transform(request: TransformRequest) -> TransformResponse:
         correlation_id=str(uuid.uuid4()),
     )
 
-    return TransformResponse(
-        mode=mode,
-        project_name=None if mode == InputMode.SINGLE_FLOW else "placeholder-project",
-        artifacts=ArtifactManifest(
-            artifacts=[],
-            output_directory=output_dir,
-            mode=mode,
-        ),
-        gaps=[],
-        warnings=[],
-        constructs=ConstructCount(),
-        telemetry=telemetry,
+    orchestrator = MigrationOrchestrator(
+        client=chat_client,
+        include_repair=True,
     )
+
+    try:
+        result = await asyncio.to_thread(
+            orchestrator.run,
+            request.input_path,
+            input_mode=mode,
+            output_directory=output_dir,
+            correlation_id=telemetry.correlation_id,
+            trace_id=telemetry.trace_id,
+            span_id=telemetry.span_id,
+        )
+    except Exception as exc:
+        logger.exception("Transform pipeline failed")
+        raise ApiError(
+            status_code=503,
+            error_code="PIPELINE_ERROR",
+            message="Transform pipeline failed",
+            detail=str(exc),
+        ) from exc
+
+    return map_transform_result(result, mode, output_dir, telemetry)
