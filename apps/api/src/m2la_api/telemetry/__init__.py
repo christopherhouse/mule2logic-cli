@@ -19,10 +19,31 @@ from __future__ import annotations
 
 import logging
 import os
+import sys
 
 logger = logging.getLogger(__name__)
 
 _TELEMETRY_INITIALIZED = False
+
+
+def _configure_logging() -> None:
+    """Configure Python logging to output to console.
+
+    Sets up a StreamHandler with formatting and configures the root logger
+    to output INFO-level logs by default. The log level can be overridden
+    via the LOG_LEVEL environment variable.
+    """
+    log_level_str = os.environ.get("LOG_LEVEL", "INFO").upper()
+    log_level = getattr(logging, log_level_str, logging.INFO)
+
+    # Configure root logger
+    logging.basicConfig(
+        level=log_level,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+        handlers=[logging.StreamHandler(sys.stdout)],
+        force=True,  # Override any existing configuration
+    )
 
 
 def init_telemetry(*, service_name: str = "m2la-api", service_version: str = "0.1.0") -> None:
@@ -34,6 +55,9 @@ def init_telemetry(*, service_name: str = "m2la-api", service_version: str = "0.
     if _TELEMETRY_INITIALIZED:
         return
     _TELEMETRY_INITIALIZED = True
+
+    # Configure Python logging first
+    _configure_logging()
 
     connection_string = os.environ.get("APPLICATIONINSIGHTS_CONNECTION_STRING", "")
 
