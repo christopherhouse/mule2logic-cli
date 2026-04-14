@@ -28,9 +28,7 @@ describe("ApiClient", () => {
   it("should send x-api-token header when apiToken is provided", async () => {
     let capturedHeaders: Record<string, string> = {};
     globalThis.fetch = vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
-      capturedHeaders = Object.fromEntries(
-        Object.entries(init.headers as Record<string, string>),
-      );
+      capturedHeaders = Object.fromEntries(Object.entries(init.headers as Record<string, string>));
       return new Response(JSON.stringify({}), { status: 200 });
     });
 
@@ -43,9 +41,7 @@ describe("ApiClient", () => {
   it("should not send x-api-token header when apiToken is not provided", async () => {
     let capturedHeaders: Record<string, string> = {};
     globalThis.fetch = vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
-      capturedHeaders = Object.fromEntries(
-        Object.entries(init.headers as Record<string, string>),
-      );
+      capturedHeaders = Object.fromEntries(Object.entries(init.headers as Record<string, string>));
       return new Response(JSON.stringify({}), { status: 200 });
     });
 
@@ -69,9 +65,9 @@ describe("ApiClient", () => {
   });
 
   it("should throw UNAUTHORIZED CliError on 401 response", async () => {
-    globalThis.fetch = vi.fn().mockResolvedValue(
-      new Response("Unauthorized", { status: 401, statusText: "Unauthorized" }),
-    );
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValue(new Response("Unauthorized", { status: 401, statusText: "Unauthorized" }));
 
     const client = new ApiClient("http://localhost:8000", "bad-token");
 

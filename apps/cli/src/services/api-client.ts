@@ -3,11 +3,7 @@
  * Communicates with the migration platform backend via HTTP.
  * Uses multipart/form-data to upload project zips and single-flow XML files.
  */
-import type {
-  AnalyzeResponse,
-  TransformResponse,
-  ValidationReport,
-} from "@m2la/contracts";
+import type { AnalyzeResponse, TransformResponse, ValidationReport } from "@m2la/contracts";
 import { CliError } from "../ui/errors.js";
 import type { PackageResult } from "./project-packager.js";
 
@@ -25,10 +21,7 @@ export class ApiClient {
   /**
    * Send an analyze request with an uploaded project or flow file.
    */
-  async analyze(
-    pkg: PackageResult,
-    mode?: string,
-  ): Promise<AnalyzeResponse> {
+  async analyze(pkg: PackageResult, mode?: string): Promise<AnalyzeResponse> {
     const formData = this.buildFormData(pkg);
     if (mode) {
       formData.append("mode", mode);

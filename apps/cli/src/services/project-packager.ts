@@ -98,7 +98,9 @@ function createZipFromDir(
       stream.on("end", () => {
         // Clean up temp file
         import("node:fs/promises").then(({ unlink }) =>
-          unlink(tmpPath).catch(() => {/* ignore cleanup errors */}),
+          unlink(tmpPath).catch(() => {
+            /* ignore cleanup errors */
+          }),
         );
         resolve(Buffer.concat(chunks));
       });

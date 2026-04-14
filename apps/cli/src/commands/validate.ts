@@ -19,8 +19,13 @@ export function createValidateCommand(): Command {
     .argument("<outputPath>", "Path to the generated Logic Apps output directory")
     .action(async (outputPath: string, _options: unknown, cmd: Command) => {
       try {
-        const parentOpts = cmd.parent?.opts() as { backendUrl?: string; apiToken?: string } | undefined;
-        const config = getConfig({ backendUrl: parentOpts?.backendUrl, apiToken: parentOpts?.apiToken });
+        const parentOpts = cmd.parent?.opts() as
+          | { backendUrl?: string; apiToken?: string }
+          | undefined;
+        const config = getConfig({
+          backendUrl: parentOpts?.backendUrl,
+          apiToken: parentOpts?.apiToken,
+        });
 
         // Verify output path exists
         const resolvedPath = resolve(outputPath);
