@@ -13,7 +13,15 @@
  * Call `initTelemetry()` once at CLI startup before executing commands.
  */
 
-import { trace, metrics, context, propagation, type Span, type Tracer, type Meter } from "@opentelemetry/api";
+import {
+  trace,
+  metrics,
+  context,
+  propagation,
+  type Span,
+  type Tracer,
+  type Meter,
+} from "@opentelemetry/api";
 
 let telemetryInitialized = false;
 let telemetryEnabled = false;
@@ -96,7 +104,10 @@ export function isTelemetryEnabled(): boolean {
  * @param attributes - Optional span attributes
  * @returns Span instance
  */
-export function startSpan(name: string, attributes?: Record<string, string | number | boolean>): Span {
+export function startSpan(
+  name: string,
+  attributes?: Record<string, string | number | boolean>,
+): Span {
   const tracer = getTracer();
   const span = tracer.startSpan(name, {
     attributes,
