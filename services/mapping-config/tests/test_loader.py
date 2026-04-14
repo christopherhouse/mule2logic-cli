@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from m2la_mapping_config import (
@@ -150,7 +152,7 @@ class TestLoadAll:
         assert len(config.auth_preferences.auth_priority) > 0
         assert len(config.auth_preferences.connector_type_priority) > 0
 
-    def test_missing_file_raises_file_not_found(self, tmp_path: pytest.fixture) -> None:
+    def test_missing_file_raises_file_not_found(self, tmp_path: Path) -> None:
         """load_all with a directory that has no YAML files should raise FileNotFoundError."""
         with pytest.raises(FileNotFoundError):
             load_connector_mappings(tmp_path)
