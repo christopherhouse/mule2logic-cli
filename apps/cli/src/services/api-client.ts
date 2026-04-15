@@ -153,7 +153,7 @@ export class ApiClient {
     );
 
     // Parse NDJSON stream (newline-delimited JSON)
-    const reader = response.body!.getReader();
+    const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
 

@@ -141,13 +141,7 @@ async def transform_stream(
         async def error_stream():
             yield _format_ndjson_event(
                 "error",
-                {
-                    "timestamp": datetime.now(UTC).isoformat(),
-                    "correlation_id": None,
-                    "agent_name": None,
-                    "message": error_msg,
-                    "data": {"error_code": "INVALID_MODE"},
-                },
+                _build_error_event_data("INVALID_MODE", error_msg),
             )
 
         return StreamingResponse(error_stream(), media_type="application/x-ndjson")
@@ -182,26 +176,22 @@ async def transform_stream(
             logger.exception("Upload failed during streaming transform")
             yield _format_ndjson_event(
                 "error",
-                {
-                    "timestamp": datetime.now(UTC).isoformat(),
-                    "correlation_id": None,
-                    "agent_name": None,
-                    "message": "Failed to process uploaded file",
-                    "data": {"error_code": "UPLOAD_ERROR", "detail": str(exc)},
-                },
+                _build_error_event_data(
+                    "UPLOAD_ERROR",
+                    "Failed to process uploaded file",
+                    detail=str(exc),
+                ),
             )
         except Exception as exc:
             if not orchestrator_error_emitted:
                 logger.exception("Transform pipeline failed during streaming")
                 yield _format_ndjson_event(
                     "error",
-                    {
-                        "timestamp": datetime.now(UTC).isoformat(),
-                        "correlation_id": None,
-                        "agent_name": None,
-                        "message": "Transform pipeline failed",
-                        "data": {"error_code": "PIPELINE_ERROR", "detail": str(exc)},
-                    },
+                    _build_error_event_data(
+                        "PIPELINE_ERROR",
+                        "Transform pipeline failed",
+                        detail=str(exc),
+                    ),
                 )
             else:
                 logger.debug("Suppressing duplicate error event — orchestrator already emitted one")
@@ -210,6 +200,36 @@ async def transform_stream(
                 cleanup_upload(input_path)
 
     return StreamingResponse(event_generator(), media_type="application/x-ndjson")
+
+
+def _build_error_event_data(
+    error_code: str,
+    message: str,
+    detail: str | None = None,
+) -> dict[str, Any]:
+    """Build a standard StreamingEvent-shaped payload for error events.
+
+    All error events share the same envelope fields; this helper avoids
+    repeating them at every call site.
+
+    Args:
+        error_code: Machine-readable error code (e.g. ``"UPLOAD_ERROR"``).
+        message: Human-readable error description.
+        detail: Optional additional detail (e.g. exception message).
+
+    Returns:
+        Dict suitable for passing to ``_format_ndjson_event``.
+    """
+    event_data: dict[str, Any] = {"error_code": error_code}
+    if detail is not None:
+        event_data["detail"] = detail
+    return {
+        "timestamp": datetime.now(UTC).isoformat(),
+        "correlation_id": None,
+        "agent_name": None,
+        "message": message,
+        "data": event_data,
+    }
 
 
 def _format_ndjson_event(event_type: str, data: dict[str, Any]) -> str:
