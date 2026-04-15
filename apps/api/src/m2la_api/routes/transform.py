@@ -11,12 +11,13 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, UploadFile
 from fastapi.responses import StreamingResponse
-from m2la_agents import MigrationOrchestrator, StreamingEvent
+from m2la_agents import MigrationOrchestrator, StreamingEvent, StreamingEventType
 from m2la_contracts import TransformResponse
 
 from m2la_api.dependencies import get_chat_client
@@ -135,11 +136,18 @@ async def transform_stream(
         resolved_mode = resolve_mode(mode, file.filename)
     except ValueError as exc:
         error_msg = str(exc)
-        # Return error as NDJSON event
+
+        # Return error as NDJSON event using the standard StreamingEvent envelope
         async def error_stream():
             yield _format_ndjson_event(
                 "error",
-                {"error_code": "INVALID_MODE", "message": error_msg},
+                {
+                    "timestamp": datetime.now(UTC).isoformat(),
+                    "correlation_id": None,
+                    "agent_name": None,
+                    "message": error_msg,
+                    "data": {"error_code": "INVALID_MODE"},
+                },
             )
 
         return StreamingResponse(error_stream(), media_type="application/x-ndjson")
@@ -149,6 +157,7 @@ async def transform_stream(
 
     async def event_generator():
         input_path: Path | None = None
+        orchestrator_error_emitted = False
         try:
             input_path = await extract_upload(file, resolved_mode)
 
@@ -165,6 +174,8 @@ async def transform_stream(
                 trace_id=telemetry.trace_id,
                 span_id=telemetry.span_id,
             ):
+                if event.event_type == StreamingEventType.ERROR:
+                    orchestrator_error_emitted = True
                 yield _format_ndjson_event(event.event_type.value, _serialize_streaming_event(event))
 
         except UploadError as exc:
@@ -172,21 +183,28 @@ async def transform_stream(
             yield _format_ndjson_event(
                 "error",
                 {
-                    "error_code": "UPLOAD_ERROR",
+                    "timestamp": datetime.now(UTC).isoformat(),
+                    "correlation_id": None,
+                    "agent_name": None,
                     "message": "Failed to process uploaded file",
-                    "detail": str(exc),
+                    "data": {"error_code": "UPLOAD_ERROR", "detail": str(exc)},
                 },
             )
         except Exception as exc:
-            logger.exception("Transform pipeline failed during streaming")
-            yield _format_ndjson_event(
-                "error",
-                {
-                    "error_code": "PIPELINE_ERROR",
-                    "message": "Transform pipeline failed",
-                    "detail": str(exc),
-                },
-            )
+            if not orchestrator_error_emitted:
+                logger.exception("Transform pipeline failed during streaming")
+                yield _format_ndjson_event(
+                    "error",
+                    {
+                        "timestamp": datetime.now(UTC).isoformat(),
+                        "correlation_id": None,
+                        "agent_name": None,
+                        "message": "Transform pipeline failed",
+                        "data": {"error_code": "PIPELINE_ERROR", "detail": str(exc)},
+                    },
+                )
+            else:
+                logger.debug("Suppressing duplicate error event — orchestrator already emitted one")
         finally:
             if input_path is not None:
                 cleanup_upload(input_path)
@@ -213,14 +231,16 @@ def _format_ndjson_event(event_type: str, data: dict[str, Any]) -> str:
 def _serialize_streaming_event(event: StreamingEvent) -> dict[str, Any]:
     """Convert StreamingEvent to JSON-serializable dict.
 
+    Note: ``event_type`` is intentionally omitted here — it is injected by
+    ``_format_ndjson_event`` to avoid duplication.
+
     Args:
         event: StreamingEvent from orchestrator
 
     Returns:
-        JSON-serializable dictionary
+        JSON-serializable dictionary (without event_type)
     """
     return {
-        "event_type": event.event_type.value,
         "timestamp": event.timestamp.isoformat(),
         "correlation_id": event.correlation_id,
         "agent_name": event.agent_name,

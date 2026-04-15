@@ -76,54 +76,84 @@ export class ApiClient {
       formData.append("output_directory", outputDirectory);
     }
 
-    const url = `${this.baseUrl}/transform/stream`;
+    const path = "/transform/stream";
+    const url = `${this.baseUrl}${path}`;
+
+    // Build headers with API token and distributed tracing propagation
     const headers: Record<string, string> = {};
     if (this.apiToken) {
       headers["x-api-token"] = this.apiToken;
     }
+    Object.assign(headers, getPropagationHeaders());
 
-    let response: Response;
-    try {
-      response = await fetch(url, {
-        method: "POST",
-        headers,
-        body: formData,
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Connection failed";
-      throw new CliError(
-        "BACKEND_UNREACHABLE",
-        `Cannot connect to backend at ${this.baseUrl}: ${message}`,
-        `Ensure the backend is running at ${this.baseUrl}.`,
-      );
-    }
+    // Fetch the streaming response, recording telemetry the same way as postMultipart
+    const response = await withSpan(
+      "m2la.cli.api.request",
+      async (span) => {
+        span.setAttribute("http.method", "POST");
+        span.setAttribute("http.url", url);
+        span.setAttribute("http.target", path);
 
-    if (!response.ok) {
-      if (response.status === 401) {
-        throw new CliError(
-          "UNAUTHORIZED",
-          "Backend rejected the request — invalid or missing API token.",
-          "Set the M2LA_API_TOKEN environment variable or pass --api-token <token>.",
-        );
-      }
+        const startTime = Date.now();
+        let res: Response;
 
-      throw new CliError(
-        "BACKEND_ERROR",
-        `Backend returned ${response.status} ${response.statusText}`,
-        "Check backend logs for details.",
-      );
-    }
+        try {
+          apiCalls.add(1, { endpoint: path, method: "POST" });
+          res = await fetch(url, {
+            method: "POST",
+            headers,
+            body: formData,
+          });
+        } catch (error) {
+          const duration = Date.now() - startTime;
+          apiLatency.record(duration, { endpoint: path, status: "error" });
+          apiErrors.add(1, { endpoint: path, error_type: "connection_failed" });
 
-    if (!response.body) {
-      throw new CliError(
-        "BACKEND_ERROR",
-        "Backend response has no body",
-        "This should not happen with streaming responses.",
-      );
-    }
+          const message = error instanceof Error ? error.message : "Connection failed";
+          throw new CliError(
+            "BACKEND_UNREACHABLE",
+            `Cannot connect to backend at ${this.baseUrl}: ${message}`,
+            `Ensure the backend is running at ${this.baseUrl}.`,
+          );
+        }
+
+        const duration = Date.now() - startTime;
+        apiLatency.record(duration, { endpoint: path, status: String(res.status) });
+        span.setAttribute("http.status_code", res.status);
+
+        if (!res.ok) {
+          apiErrors.add(1, { endpoint: path, error_type: `http_${res.status}` });
+
+          if (res.status === 401) {
+            throw new CliError(
+              "UNAUTHORIZED",
+              "Backend rejected the request — invalid or missing API token.",
+              "Set the M2LA_API_TOKEN environment variable or pass --api-token <token>.",
+            );
+          }
+
+          throw new CliError(
+            "BACKEND_ERROR",
+            `Backend returned ${res.status} ${res.statusText}`,
+            "Check backend logs for details.",
+          );
+        }
+
+        if (!res.body) {
+          throw new CliError(
+            "BACKEND_ERROR",
+            "Backend response has no body",
+            "This should not happen with streaming responses.",
+          );
+        }
+
+        return res;
+      },
+      { "api.endpoint": path },
+    );
 
     // Parse NDJSON stream (newline-delimited JSON)
-    const reader = response.body.getReader();
+    const reader = response.body!.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
 

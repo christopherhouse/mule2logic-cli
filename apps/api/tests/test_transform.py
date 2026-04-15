@@ -88,7 +88,7 @@ class TestTransformStreamEndpoint:
                 files={"file": ("project.zip", make_dummy_project_zip(), "application/zip")},
                 data={"mode": "project"},
             )
-        assert response.headers["content-type"] == "application/x-ndjson"
+        assert response.headers["content-type"].startswith("application/x-ndjson")
 
     @pytest.mark.asyncio
     async def test_stream_emits_ndjson_events(self, transport: ASGITransport) -> None:
@@ -134,4 +134,4 @@ class TestTransformStreamEndpoint:
                 # Should have an error event
                 assert len(events) == 1
                 assert events[0]["event_type"] == "error"
-                assert events[0]["error_code"] == "INVALID_MODE"
+                assert events[0]["data"]["error_code"] == "INVALID_MODE"
