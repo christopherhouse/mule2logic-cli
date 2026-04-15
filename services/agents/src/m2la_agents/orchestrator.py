@@ -33,7 +33,14 @@ from opentelemetry import metrics, trace
 
 from m2la_agents.analyzer import AnalyzerAgent
 from m2la_agents.base import BaseAgent
-from m2la_agents.models import AgentResult, AgentStatus, OrchestrationResult, StepResult
+from m2la_agents.models import (
+    AgentResult,
+    AgentStatus,
+    OrchestrationResult,
+    StepResult,
+    StreamingEvent,
+    StreamingEventType,
+)
 from m2la_agents.planner import PlannerAgent
 from m2la_agents.repair_advisor import RepairAdvisorAgent
 from m2la_agents.token_estimator import estimate_message_tokens, estimate_text_tokens
@@ -224,6 +231,189 @@ class MigrationOrchestrator:
                 output_directory=output_directory,
                 pipeline_start=pipeline_start,
             )
+        finally:
+            total_ms = (time.monotonic() - pipeline_start) * 1000
+            _pipeline_active.add(-1)
+            _pipeline_duration.record(total_ms)
+
+    async def run_streaming(
+        self,
+        input_path: str,
+        *,
+        input_mode: InputMode | None = None,
+        output_directory: str | None = None,
+        correlation_id: str | None = None,
+        trace_id: str = "",
+        span_id: str = "",
+        metadata: dict | None = None,
+    ):
+        """Execute the migration pipeline with streaming events.
+
+        Yields :class:`StreamingEvent` objects as the pipeline progresses,
+        allowing clients to display real-time status updates instead of
+        waiting for the entire pipeline to complete.
+
+        This is an async generator that must be consumed with ``async for``::
+
+            async for event in orchestrator.run_streaming(input_path):
+                print(f"{event.event_type}: {event.message}")
+
+        Event types:
+
+        * ``AGENT_STARTED`` — an agent has begun execution
+        * ``AGENT_PROGRESS`` — intermediate progress from an agent
+        * ``AGENT_COMPLETED`` — an agent has finished (success or failure)
+        * ``TOOL_CALL`` — a tool function was invoked
+        * ``ERROR`` — an error occurred
+        * ``COMPLETE`` — the entire pipeline has completed
+
+        Args:
+            input_path: Path to MuleSoft project root or single flow XML
+            input_mode: Input mode override (auto-detected if None)
+            output_directory: Output directory for artifacts
+            correlation_id: Correlation ID for observability
+            trace_id: OpenTelemetry trace ID
+            span_id: OpenTelemetry span ID
+            metadata: Additional metadata
+
+        Yields:
+            StreamingEvent: Real-time progress events
+        """
+        from pathlib import PurePosixPath
+
+        cid = correlation_id or str(uuid.uuid4())
+        pipeline_start = time.monotonic()
+        _pipeline_active.add(1)
+
+        try:
+            with _tracer.start_as_current_span("m2la.orchestrate.streaming") as span:
+                span.set_attribute("correlation_id", cid)
+                span.set_attribute("input.filename", PurePosixPath(input_path).name)
+                if input_mode:
+                    span.set_attribute("input.mode", input_mode.value)
+
+                # Handle empty agent list
+                if not self.agents:
+                    total_ms = (time.monotonic() - pipeline_start) * 1000
+                    _pipeline_requests.add(1, {"status": "success"})
+                    yield StreamingEvent(
+                        event_type=StreamingEventType.COMPLETE,
+                        correlation_id=cid,
+                        data={"overall_status": "success", "total_duration_ms": total_ms},
+                        message="Pipeline completed (no agents configured)",
+                    )
+                    return
+
+                # Construct user message
+                mode_str = input_mode.value if input_mode else "auto-detect"
+                user_message = (
+                    f"Migrate the MuleSoft project at: {input_path}\n"
+                    f"Input mode: {mode_str}\n"
+                    f"Output directory: {output_directory or 'default'}\n"
+                    f"Correlation ID: {cid}"
+                )
+
+                logger.info(
+                    "Starting streaming migration pipeline [correlation_id=%s, mode=%s]",
+                    cid,
+                    mode_str,
+                )
+
+                # Estimate prompt tokens
+                for agent in self.agents:
+                    messages = [
+                        {"role": "system", "content": agent.instructions},
+                        {"role": "user", "content": user_message},
+                    ]
+                    est_prompt = estimate_message_tokens(messages)
+                    _llm_estimated_prompt.add(est_prompt, {"agent_name": agent.name})
+
+                # Execute workflow and stream events
+                step_results: list[StepResult] = []
+                overall_status = AgentStatus.SUCCESS
+                final_output: Any = None
+
+                try:
+                    llm_start = time.monotonic()
+                    agent_idx = 0
+
+                    async for event in self._execute_workflow_streaming(user_message, cid):
+                        # Yield MAF events as streaming events
+                        yield event
+
+                        # Track agent progress
+                        if event.event_type == StreamingEventType.AGENT_COMPLETED:
+                            step = event.data.get("step_result")
+                            if step:
+                                step_results.append(step)
+                                agent_idx += 1
+
+                                # Update metrics
+                                attrs = {"agent_name": step.step_name, "status": step.agent_result.status.value}
+                                _agent_invocations.add(1, attrs)
+                                _agent_duration.record(step.agent_result.duration_ms, {"agent_name": step.step_name})
+                                if step.agent_result.status == AgentStatus.FAILURE:
+                                    _agent_errors.add(1, {"agent_name": step.step_name})
+
+                                # Estimate completion tokens
+                                reasoning = step.agent_result.reasoning_summary or ""
+                                est_completion = estimate_text_tokens(reasoning)
+                                _llm_estimated_completion.add(est_completion, {"agent_name": step.step_name})
+
+                                # Update overall status
+                                if step.agent_result.status == AgentStatus.FAILURE:
+                                    overall_status = AgentStatus.FAILURE
+                                elif (
+                                    step.agent_result.status == AgentStatus.PARTIAL
+                                    and overall_status == AgentStatus.SUCCESS
+                                ):
+                                    overall_status = AgentStatus.PARTIAL
+                                final_output = step.agent_result.output
+
+                    llm_elapsed = (time.monotonic() - llm_start) * 1000
+                    _llm_calls.add(1, {"status": "success"})
+                    _llm_latency.record(llm_elapsed)
+
+                except Exception as exc:
+                    _llm_calls.add(1, {"status": "error"})
+                    logger.exception("Streaming workflow execution failed")
+                    overall_status = AgentStatus.FAILURE
+                    yield StreamingEvent(
+                        event_type=StreamingEventType.ERROR,
+                        correlation_id=cid,
+                        data={"error": str(exc)},
+                        message=f"Pipeline failed: {exc}",
+                    )
+                    raise
+
+                # Yield final completion event
+                total_ms = (time.monotonic() - pipeline_start) * 1000
+                span.set_attribute("pipeline.status", overall_status.value)
+                span.set_attribute("pipeline.steps", len(step_results))
+                span.set_attribute("pipeline.duration_ms", total_ms)
+
+                _pipeline_requests.add(1, {"status": overall_status.value})
+
+                logger.info(
+                    "Streaming pipeline completed [correlation_id=%s, status=%s, steps=%d, duration=%.1fms]",
+                    cid,
+                    overall_status.value,
+                    len(step_results),
+                    total_ms,
+                )
+
+                yield StreamingEvent(
+                    event_type=StreamingEventType.COMPLETE,
+                    correlation_id=cid,
+                    data={
+                        "overall_status": overall_status.value,
+                        "total_duration_ms": total_ms,
+                        "steps": len(step_results),
+                        "final_output": final_output,
+                    },
+                    message=f"Pipeline completed with status: {overall_status.value}",
+                )
+
         finally:
             total_ms = (time.monotonic() - pipeline_start) * 1000
             _pipeline_active.add(-1)
@@ -465,6 +655,79 @@ class MigrationOrchestrator:
                     _llm_actual_total.add(total_tokens)
 
         return self._parse_conversation_steps(final_conversation)
+
+    async def _execute_workflow_streaming(
+        self,
+        user_message: str,
+        correlation_id: str,
+    ):
+        """Run workflow with streaming, yielding events as agents execute.
+
+        This method builds a fresh workflow and streams events from the
+        Microsoft Agent Framework as they occur, converting MAF events
+        into :class:`StreamingEvent` objects.
+
+        Yields:
+            StreamingEvent: Real-time progress events
+        """
+        workflow = self._build_workflow()
+        final_conversation: list[Any] = []
+        agent_idx = 0
+        agent_start_time: dict[str, float] = {}
+
+        async for event in workflow.run(user_message, stream=True):
+            event_type = getattr(event, "type", "")
+
+            # Track agent starts/completions based on conversation flow
+            if event_type == "agent_start" or (event_type == "message" and agent_idx < len(self.agents)):
+                # Agent started
+                agent_name = self.agents[agent_idx].name if agent_idx < len(self.agents) else f"Agent-{agent_idx}"
+                agent_start_time[agent_name] = time.monotonic()
+                yield StreamingEvent(
+                    event_type=StreamingEventType.AGENT_STARTED,
+                    correlation_id=correlation_id,
+                    agent_name=agent_name,
+                    data={"agent_index": agent_idx},
+                    message=f"Starting {agent_name}",
+                )
+
+            # Capture final conversation
+            if event_type == "output":
+                final_conversation = event.data if event.data else []
+
+                # Parse and yield completion events for all completed agents
+                steps = self._parse_conversation_steps(final_conversation)
+                for step in steps[agent_idx:]:
+                    agent_name = step.step_name
+                    duration_ms = (time.monotonic() - agent_start_time.get(agent_name, time.monotonic())) * 1000
+
+                    yield StreamingEvent(
+                        event_type=StreamingEventType.AGENT_COMPLETED,
+                        correlation_id=correlation_id,
+                        agent_name=agent_name,
+                        data={
+                            "status": step.agent_result.status.value,
+                            "duration_ms": duration_ms,
+                            "step_result": step,
+                        },
+                        message=f"{agent_name} completed with status: {step.agent_result.status.value}",
+                    )
+                    agent_idx += 1
+
+            # Capture token usage
+            usage = getattr(event, "usage", None) or (
+                event.data.get("usage") if isinstance(getattr(event, "data", None), dict) else None
+            )
+            if usage and isinstance(usage, dict):
+                prompt_tokens = usage.get("prompt_tokens", 0)
+                completion_tokens = usage.get("completion_tokens", 0)
+                total_tokens = usage.get("total_tokens", 0)
+                if prompt_tokens:
+                    _llm_actual_prompt.add(prompt_tokens)
+                if completion_tokens:
+                    _llm_actual_completion.add(completion_tokens)
+                if total_tokens:
+                    _llm_actual_total.add(total_tokens)
 
     def _parse_conversation_steps(
         self,
