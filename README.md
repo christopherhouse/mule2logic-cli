@@ -142,6 +142,28 @@ m2la transform path/to/flow.xml --stream
 - Returns full results once pipeline finishes
 - Compatible with older backend versions
 
+#### CLI Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `M2LA_BACKEND_URL` | `http://localhost:8000` | Backend API base URL |
+| `M2LA_API_TOKEN` | (none) | Optional API token for backend authentication |
+| `M2LA_VERBOSE` | `false` | Enable verbose output |
+| `APPLICATIONINSIGHTS_CONNECTION_STRING` | (none) | Azure Monitor connection string for telemetry export |
+| `OTEL_SERVICE_NAME` | `m2la-cli` | Optional service name override for OpenTelemetry |
+
+**Azure Monitor / Application Insights Configuration:**
+
+To enable telemetry export to Azure Application Insights, set the `APPLICATIONINSIGHTS_CONNECTION_STRING` environment variable to your Application Insights connection string:
+
+```bash
+export APPLICATIONINSIGHTS_CONNECTION_STRING="InstrumentationKey=<key>;IngestionEndpoint=<endpoint>;LiveEndpoint=<endpoint>"
+```
+
+You can find your connection string in the Azure Portal under your Application Insights resource → Overview → Connection String.
+
+When the connection string is not set, the CLI runs in local development mode with telemetry disabled.
+
 ## Development
 
 ### API — Lint, Format, and Test

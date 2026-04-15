@@ -6,6 +6,10 @@ import {
   createTransformCommand,
   createValidateCommand,
 } from "./commands/index.js";
+import { initTelemetry } from "./telemetry/index.js";
+
+// Initialize telemetry at startup (before any commands execute)
+await initTelemetry();
 
 const program = new Command();
 
