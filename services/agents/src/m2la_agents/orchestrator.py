@@ -691,6 +691,18 @@ class MigrationOrchestrator:
                     message=f"Starting {agent_name}",
                 )
 
+            # Capture tool calls
+            if event_type == "tool_call_start":
+                current_agent = self.agents[agent_idx].name if agent_idx < len(self.agents) else f"Agent-{agent_idx}"
+                tool_name = getattr(event, "name", "unknown")
+                yield StreamingEvent(
+                    event_type=StreamingEventType.TOOL_CALL,
+                    correlation_id=correlation_id,
+                    agent_name=current_agent,
+                    data={"tool_name": tool_name},
+                    message=f"{current_agent} calling tool: {tool_name}",
+                )
+
             # Capture final conversation
             if event_type == "output":
                 final_conversation = event.data if event.data else []

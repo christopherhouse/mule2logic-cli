@@ -232,17 +232,36 @@ export function printValidationResult(report: ValidationReport): void {
  */
 export function printStreamingProgress(
   agentName: string,
-  status: "started" | "completed" | "error",
+  status: "started" | "progress" | "completed" | "error",
   durationMs?: number,
+  message?: string,
+  agentStatus?: string,
 ): void {
   if (status === "started") {
     console.log(chalk.cyan(`  🔄  ${agentName} started...`));
+  } else if (status === "progress") {
+    const msg = message ? `: ${message}` : "";
+    console.log(chalk.blue(`     ⏳ ${agentName}${msg}`));
   } else if (status === "completed") {
     const duration = durationMs ? ` (${(durationMs / 1000).toFixed(1)}s)` : "";
-    console.log(chalk.green(`  ✅  ${agentName} completed${duration}`));
+    const statusIcon = agentStatus === "failure" ? "❌" : agentStatus === "partial" ? "⚠️" : "✅";
+    const statusColor =
+      agentStatus === "failure"
+        ? chalk.red
+        : agentStatus === "partial"
+          ? chalk.yellow
+          : chalk.green;
+    console.log(statusColor(`  ${statusIcon}  ${agentName} completed${duration}`));
   } else if (status === "error") {
     console.log(chalk.red(`  ❌  ${agentName} failed`));
   }
+}
+
+/**
+ * Print a tool call event during streaming.
+ */
+export function printStreamingToolCall(agentName: string, toolName: string): void {
+  console.log(chalk.gray(`     🔧 ${agentName} → ${toolName}`));
 }
 
 /**

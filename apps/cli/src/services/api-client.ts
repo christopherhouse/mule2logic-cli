@@ -60,7 +60,7 @@ export class ApiClient {
   }
 
   /**
-   * Send a streaming transform request with Server-Sent Events.
+   * Send a streaming transform request with HTTP chunked transfer encoding.
    * Returns an async generator that yields events as they arrive.
    */
   async *transformStreaming(
@@ -122,7 +122,7 @@ export class ApiClient {
       );
     }
 
-    // Parse SSE stream
+    // Parse NDJSON stream (newline-delimited JSON)
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
@@ -134,47 +134,24 @@ export class ApiClient {
 
         buffer += decoder.decode(value, { stream: true });
 
-        // Process complete events (separated by double newlines)
-        const events = buffer.split("\n\n");
-        buffer = events.pop() || ""; // Keep incomplete event in buffer
+        // Process complete lines (separated by newlines)
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || ""; // Keep incomplete line in buffer
 
-        for (const eventText of events) {
-          if (!eventText.trim()) continue;
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
 
-          const event = this.parseSSE(eventText);
-          if (event) {
+          try {
+            const event = JSON.parse(trimmed) as StreamingEvent;
             yield event;
+          } catch (parseError) {
+            console.warn(`Failed to parse streaming event: ${trimmed}`);
           }
         }
       }
     } finally {
       reader.releaseLock();
-    }
-  }
-
-  /**
-   * Parse a single SSE event from text.
-   */
-  private parseSSE(eventText: string): StreamingEvent | null {
-    const lines = eventText.split("\n");
-    let eventType = "";
-    let data = "";
-
-    for (const line of lines) {
-      if (line.startsWith("event:")) {
-        eventType = line.substring(6).trim();
-      } else if (line.startsWith("data:")) {
-        data = line.substring(5).trim();
-      }
-    }
-
-    if (!data) return null;
-
-    try {
-      const parsed = JSON.parse(data) as StreamingEvent;
-      return parsed;
-    } catch {
-      return null;
     }
   }
 
