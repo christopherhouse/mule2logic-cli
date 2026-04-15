@@ -1,5 +1,7 @@
 """Tests for the transform endpoint."""
 
+import json
+
 import pytest
 from httpx import ASGITransport, AsyncClient
 from upload_helpers import make_dummy_project_zip, make_single_flow_xml
@@ -72,3 +74,64 @@ class TestTransformEndpoint:
         data = response.json()
         expected_keys = {"error_code", "message", "detail", "severity"}
         assert expected_keys.issubset(data.keys())
+
+
+class TestTransformStreamEndpoint:
+    """Tests for POST /transform/stream (NDJSON streaming)."""
+
+    @pytest.mark.asyncio
+    async def test_stream_returns_ndjson_content_type(self, transport: ASGITransport) -> None:
+        """Streaming endpoint should return application/x-ndjson content type."""
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.post(
+                "/transform/stream",
+                files={"file": ("project.zip", make_dummy_project_zip(), "application/zip")},
+                data={"mode": "project"},
+            )
+        assert response.headers["content-type"].startswith("application/x-ndjson")
+
+    @pytest.mark.asyncio
+    async def test_stream_emits_ndjson_events(self, transport: ASGITransport) -> None:
+        """Streaming endpoint should emit newline-delimited JSON events."""
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            async with client.stream(
+                "POST",
+                "/transform/stream",
+                files={"file": ("project.zip", make_dummy_project_zip(), "application/zip")},
+                data={"mode": "project"},
+            ) as response:
+                # Collect all events
+                events = []
+                async for line in response.aiter_lines():
+                    if line.strip():
+                        event = json.loads(line)
+                        events.append(event)
+
+                # Should have received at least one event (likely an error event due to MockChatClient)
+                assert len(events) > 0
+
+                # All events should have event_type field
+                for event in events:
+                    assert "event_type" in event
+
+    @pytest.mark.asyncio
+    async def test_stream_handles_invalid_mode(self, transport: ASGITransport) -> None:
+        """Streaming endpoint should return error event for invalid mode."""
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            async with client.stream(
+                "POST",
+                "/transform/stream",
+                files={"file": ("test.xyz", b"invalid", "application/octet-stream")},
+                data={"mode": "invalid_mode"},
+            ) as response:
+                # Collect events
+                events = []
+                async for line in response.aiter_lines():
+                    if line.strip():
+                        event = json.loads(line)
+                        events.append(event)
+
+                # Should have an error event
+                assert len(events) == 1
+                assert events[0]["event_type"] == "error"
+                assert events[0]["data"]["error_code"] == "INVALID_MODE"

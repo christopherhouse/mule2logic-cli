@@ -11,12 +11,13 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, UploadFile
 from fastapi.responses import StreamingResponse
-from m2la_agents import MigrationOrchestrator, StreamingEvent
+from m2la_agents import MigrationOrchestrator, StreamingEvent, StreamingEventType
 from m2la_contracts import TransformResponse
 
 from m2la_api.dependencies import get_chat_client
@@ -106,28 +107,20 @@ async def transform_stream(
     telemetry_json: str | None = Form(None, description="Telemetry context as JSON string"),
     chat_client: Any = Depends(get_chat_client),
 ) -> StreamingResponse:
-    """Transform with Server-Sent Events streaming.
+    """Transform with HTTP streaming.
 
     Returns real-time progress updates as the migration pipeline executes,
     allowing clients to display agent-by-agent progress instead of waiting
     for the entire pipeline to complete.
 
-    The response uses Server-Sent Events (SSE) format with ``text/event-stream``
-    content type. Each event contains:
+    The response uses HTTP chunked transfer encoding with newline-delimited JSON (NDJSON).
+    Each line is a complete JSON object representing an event.
 
-    * ``event:`` — event type (agent_started, agent_completed, complete, error)
-    * ``data:`` — JSON payload with event details
+    Example NDJSON stream::
 
-    Example SSE stream::
-
-        event: agent_started
-        data: {"agent_name": "AnalyzerAgent", "correlation_id": "..."}
-
-        event: agent_completed
-        data: {"agent_name": "AnalyzerAgent", "status": "success", "duration_ms": 1234}
-
-        event: complete
-        data: {"overall_status": "success", "total_duration_ms": 5678}
+        {"event_type": "agent_started", "agent_name": "AnalyzerAgent", "correlation_id": "...", ...}
+        {"event_type": "agent_completed", "agent_name": "AnalyzerAgent", "status": "success", ...}
+        {"event_type": "complete", "overall_status": "success", "total_duration_ms": 5678, ...}
 
     Args:
         file: Project zip or single flow XML file
@@ -137,26 +130,28 @@ async def transform_stream(
         chat_client: Injected chat client dependency
 
     Returns:
-        StreamingResponse with text/event-stream content
+        StreamingResponse with application/x-ndjson content
     """
     try:
         resolved_mode = resolve_mode(mode, file.filename)
     except ValueError as exc:
         error_msg = str(exc)
-        # Return error as SSE event
+
+        # Return error as NDJSON event using the standard StreamingEvent envelope
         async def error_stream():
-            yield _format_sse_event(
+            yield _format_ndjson_event(
                 "error",
-                {"error_code": "INVALID_MODE", "message": error_msg},
+                _build_error_event_data("INVALID_MODE", error_msg),
             )
 
-        return StreamingResponse(error_stream(), media_type="text/event-stream")
+        return StreamingResponse(error_stream(), media_type="application/x-ndjson")
 
     output_dir = output_directory or "./output"
     telemetry = parse_telemetry(telemetry_json)
 
     async def event_generator():
         input_path: Path | None = None
+        orchestrator_error_emitted = False
         try:
             input_path = await extract_upload(file, resolved_mode)
 
@@ -173,65 +168,99 @@ async def transform_stream(
                 trace_id=telemetry.trace_id,
                 span_id=telemetry.span_id,
             ):
-                yield _format_sse_event(event.event_type.value, _serialize_streaming_event(event))
+                if event.event_type == StreamingEventType.ERROR:
+                    orchestrator_error_emitted = True
+                yield _format_ndjson_event(event.event_type.value, _serialize_streaming_event(event))
 
         except UploadError as exc:
             logger.exception("Upload failed during streaming transform")
-            yield _format_sse_event(
+            yield _format_ndjson_event(
                 "error",
-                {
-                    "error_code": "UPLOAD_ERROR",
-                    "message": "Failed to process uploaded file",
-                    "detail": str(exc),
-                },
+                _build_error_event_data(
+                    "UPLOAD_ERROR",
+                    "Failed to process uploaded file",
+                    detail=str(exc),
+                ),
             )
         except Exception as exc:
-            logger.exception("Transform pipeline failed during streaming")
-            yield _format_sse_event(
-                "error",
-                {
-                    "error_code": "PIPELINE_ERROR",
-                    "message": "Transform pipeline failed",
-                    "detail": str(exc),
-                },
-            )
+            if not orchestrator_error_emitted:
+                logger.exception("Transform pipeline failed during streaming")
+                yield _format_ndjson_event(
+                    "error",
+                    _build_error_event_data(
+                        "PIPELINE_ERROR",
+                        "Transform pipeline failed",
+                        detail=str(exc),
+                    ),
+                )
+            else:
+                logger.debug("Suppressing duplicate error event — orchestrator already emitted one")
         finally:
             if input_path is not None:
                 cleanup_upload(input_path)
 
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
+    return StreamingResponse(event_generator(), media_type="application/x-ndjson")
 
 
-def _format_sse_event(event_type: str, data: dict[str, Any]) -> str:
-    """Format a Server-Sent Event.
+def _build_error_event_data(
+    error_code: str,
+    message: str,
+    detail: str | None = None,
+) -> dict[str, Any]:
+    """Build a standard StreamingEvent-shaped payload for error events.
 
-    SSE format:
-        event: <event_type>
-        data: <json>
-        <blank line>
+    All error events share the same envelope fields; this helper avoids
+    repeating them at every call site.
+
+    Args:
+        error_code: Machine-readable error code (e.g. ``"UPLOAD_ERROR"``).
+        message: Human-readable error description.
+        detail: Optional additional detail (e.g. exception message).
+
+    Returns:
+        Dict suitable for passing to ``_format_ndjson_event``.
+    """
+    event_data: dict[str, Any] = {"error_code": error_code}
+    if detail is not None:
+        event_data["detail"] = detail
+    return {
+        "timestamp": datetime.now(UTC).isoformat(),
+        "correlation_id": None,
+        "agent_name": None,
+        "message": message,
+        "data": event_data,
+    }
+
+
+def _format_ndjson_event(event_type: str, data: dict[str, Any]) -> str:
+    """Format a newline-delimited JSON event.
+
+    NDJSON format: each event is a single JSON object on one line, followed by a newline.
 
     Args:
         event_type: Event type name
-        data: Event payload (will be JSON-encoded)
+        data: Event payload (will be merged with event_type)
 
     Returns:
-        Formatted SSE event string
+        Formatted NDJSON event string (JSON + newline)
     """
-    json_data = json.dumps(data, default=str)
-    return f"event: {event_type}\ndata: {json_data}\n\n"
+    event_data = {"event_type": event_type, **data}
+    return json.dumps(event_data, default=str) + "\n"
 
 
 def _serialize_streaming_event(event: StreamingEvent) -> dict[str, Any]:
     """Convert StreamingEvent to JSON-serializable dict.
 
+    Note: ``event_type`` is intentionally omitted here — it is injected by
+    ``_format_ndjson_event`` to avoid duplication.
+
     Args:
         event: StreamingEvent from orchestrator
 
     Returns:
-        JSON-serializable dictionary
+        JSON-serializable dictionary (without event_type)
     """
     return {
-        "event_type": event.event_type.value,
         "timestamp": event.timestamp.isoformat(),
         "correlation_id": event.correlation_id,
         "agent_name": event.agent_name,

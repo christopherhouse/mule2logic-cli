@@ -14,6 +14,7 @@ import {
   createSpinner,
   printStreamingProgress,
   printStreamingComplete,
+  printStreamingToolCall,
 } from "../ui/output.js";
 import { handleError } from "../ui/errors.js";
 import { withSpan } from "../telemetry/index.js";
@@ -87,10 +88,36 @@ export function createTransformCommand(): Command {
                   for await (const event of client.transformStreaming(pkg, mode, options.output)) {
                     if (event.event_type === "agent_started" && event.agent_name) {
                       printStreamingProgress(event.agent_name, "started");
+                    } else if (event.event_type === "agent_progress" && event.agent_name) {
+                      // Show intermediate progress messages
+                      if (event.message) {
+                        printStreamingProgress(
+                          event.agent_name,
+                          "progress",
+                          undefined,
+                          event.message,
+                        );
+                      }
+                    } else if (event.event_type === "tool_call" && event.agent_name) {
+                      // Show tool calls
+                      const toolName = event.data.tool_name as string | undefined;
+                      if (toolName) {
+                        printStreamingToolCall(event.agent_name, toolName);
+                      }
                     } else if (event.event_type === "agent_completed" && event.agent_name) {
                       const durationMs =
-                        typeof event.data.duration_ms === "number" ? event.data.duration_ms : undefined;
-                      printStreamingProgress(event.agent_name, "completed", durationMs);
+                        typeof event.data.duration_ms === "number"
+                          ? event.data.duration_ms
+                          : undefined;
+                      const status =
+                        typeof event.data.status === "string" ? event.data.status : "success";
+                      printStreamingProgress(
+                        event.agent_name,
+                        "completed",
+                        durationMs,
+                        undefined,
+                        status,
+                      );
                     } else if (event.event_type === "complete") {
                       const overallStatus =
                         typeof event.data.overall_status === "string"

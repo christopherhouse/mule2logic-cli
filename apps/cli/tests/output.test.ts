@@ -14,6 +14,9 @@ import {
   printAnalysisResult,
   printTransformResult,
   printValidationResult,
+  printStreamingProgress,
+  printStreamingToolCall,
+  printStreamingComplete,
 } from "../src/ui/output.js";
 
 describe("UI output helpers", () => {
@@ -240,5 +243,127 @@ describe("UI output helpers", () => {
     const output = consoleSpy.mock.calls.map((c) => String(c[0] ?? "")).join("\n");
     expect(output).toContain("Validation Failed");
     expect(output).toContain("SCHEMA_001");
+  });
+});
+
+describe("Streaming UI helpers", () => {
+  let consoleSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    consoleSpy.mockRestore();
+  });
+
+  describe("printStreamingProgress", () => {
+    it("should show started state with agent name", () => {
+      printStreamingProgress("AnalyzerAgent", "started");
+      const output = consoleSpy.mock.calls.map((c) => String(c[0] ?? "")).join("\n");
+      expect(output).toContain("AnalyzerAgent");
+      expect(output).toContain("started");
+    });
+
+    it("should show progress state with message", () => {
+      printStreamingProgress("PlannerAgent", "progress", undefined, "Processing flows");
+      const output = consoleSpy.mock.calls.map((c) => String(c[0] ?? "")).join("\n");
+      expect(output).toContain("PlannerAgent");
+      expect(output).toContain("Processing flows");
+    });
+
+    it("should show progress state without message", () => {
+      printStreamingProgress("PlannerAgent", "progress");
+      const output = consoleSpy.mock.calls.map((c) => String(c[0] ?? "")).join("\n");
+      expect(output).toContain("PlannerAgent");
+    });
+
+    it("should show completed state with success icon for success status", () => {
+      printStreamingProgress("TransformerAgent", "completed", 2300, undefined, "success");
+      const output = consoleSpy.mock.calls.map((c) => String(c[0] ?? "")).join("\n");
+      expect(output).toContain("TransformerAgent");
+      expect(output).toContain("completed");
+      expect(output).toContain("✅");
+      expect(output).toContain("2.3s");
+    });
+
+    it("should show completed state with warning icon for partial status", () => {
+      printStreamingProgress("ValidatorAgent", "completed", 1500, undefined, "partial");
+      const output = consoleSpy.mock.calls.map((c) => String(c[0] ?? "")).join("\n");
+      expect(output).toContain("ValidatorAgent");
+      expect(output).toContain("⚠️");
+    });
+
+    it("should show completed state with error icon for failure status", () => {
+      printStreamingProgress("RepairAdvisorAgent", "completed", 800, undefined, "failure");
+      const output = consoleSpy.mock.calls.map((c) => String(c[0] ?? "")).join("\n");
+      expect(output).toContain("RepairAdvisorAgent");
+      expect(output).toContain("❌");
+    });
+
+    it("should show completed state without duration when not provided", () => {
+      printStreamingProgress("AnalyzerAgent", "completed");
+      const output = consoleSpy.mock.calls.map((c) => String(c[0] ?? "")).join("\n");
+      expect(output).toContain("AnalyzerAgent");
+      expect(output).toContain("completed");
+    });
+
+    it("should show error state with agent name", () => {
+      printStreamingProgress("TransformerAgent", "error");
+      const output = consoleSpy.mock.calls.map((c) => String(c[0] ?? "")).join("\n");
+      expect(output).toContain("TransformerAgent");
+      expect(output).toContain("failed");
+    });
+  });
+
+  describe("printStreamingToolCall", () => {
+    it("should display agent name and tool name", () => {
+      printStreamingToolCall("AnalyzerAgent", "search_mulesoft_docs");
+      const output = consoleSpy.mock.calls.map((c) => String(c[0] ?? "")).join("\n");
+      expect(output).toContain("AnalyzerAgent");
+      expect(output).toContain("search_mulesoft_docs");
+    });
+
+    it("should include tool call indicator", () => {
+      printStreamingToolCall("TransformerAgent", "fetch_logic_apps_doc");
+      const output = consoleSpy.mock.calls.map((c) => String(c[0] ?? "")).join("\n");
+      expect(output).toContain("🔧");
+    });
+
+    it("should include arrow separator between agent and tool", () => {
+      printStreamingToolCall("PlannerAgent", "parse_mule_flow");
+      const output = consoleSpy.mock.calls.map((c) => String(c[0] ?? "")).join("\n");
+      expect(output).toContain("→");
+    });
+  });
+
+  describe("printStreamingComplete", () => {
+    it("should show success message when overall status is success", () => {
+      printStreamingComplete("success", 7500, 5);
+      const output = consoleSpy.mock.calls.map((c) => String(c[0] ?? "")).join("\n");
+      expect(output).toContain("✅");
+      expect(output).toContain("7.5s");
+      expect(output).toContain("5");
+    });
+
+    it("should show failure message when overall status is failure", () => {
+      printStreamingComplete("failure", 3200, 2);
+      const output = consoleSpy.mock.calls.map((c) => String(c[0] ?? "")).join("\n");
+      expect(output).toContain("❌");
+      expect(output).toContain("3.2s");
+    });
+
+    it("should show warning message for non-success/failure statuses", () => {
+      printStreamingComplete("partial", 5000, 4);
+      const output = consoleSpy.mock.calls.map((c) => String(c[0] ?? "")).join("\n");
+      expect(output).toContain("⚠️");
+      expect(output).toContain("5.0s");
+    });
+
+    it("should show agent count", () => {
+      printStreamingComplete("success", 10000, 3);
+      const output = consoleSpy.mock.calls.map((c) => String(c[0] ?? "")).join("\n");
+      expect(output).toContain("3");
+    });
   });
 });
